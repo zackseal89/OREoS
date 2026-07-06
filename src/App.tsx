@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Outlet, Route, Routes } from "react-router-dom";
 import { Sidebar } from "./components/layout/Sidebar";
+import { RequireAuth } from "./components/auth/RequireAuth";
 import { CreateCampaignModal } from "./components/campaigns/CreateCampaignModal";
+import { AuthPage } from "./pages/AuthPage";
 import { ApprovalsPage } from "./pages/ApprovalsPage";
 import { AssetsPage } from "./pages/AssetsPage";
 import { BrandsPage } from "./pages/BrandsPage";
@@ -58,21 +60,24 @@ function App() {
   return (
     <>
       <Routes>
-        {/* Public marketing site — no app sidebar */}
+        {/* Public — no app sidebar, no auth required */}
         <Route path="/home" element={<LandingPage />} />
+        <Route path="/login" element={<AuthPage />} />
 
-        {/* Internal product — sidebar + routed pages */}
-        <Route element={<AppShell />}>
-          <Route path="/" element={<ProductIntakePage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/campaigns" element={<CampaignsPage />} />
-          <Route path="/campaigns/:id" element={<CampaignDetailPage />} />
-          <Route path="/products" element={<ProductsPage />} />
-          <Route path="/products/:id" element={<ProductDetailPage />} />
-          <Route path="/brands" element={<BrandsPage />} />
-          <Route path="/assets" element={<AssetsPage />} />
-          <Route path="/approvals" element={<ApprovalsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+        {/* Internal product — requires a session, then sidebar + routed pages */}
+        <Route element={<RequireAuth />}>
+          <Route element={<AppShell />}>
+            <Route path="/" element={<ProductIntakePage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/campaigns" element={<CampaignsPage />} />
+            <Route path="/campaigns/:id" element={<CampaignDetailPage />} />
+            <Route path="/products" element={<ProductsPage />} />
+            <Route path="/products/:id" element={<ProductDetailPage />} />
+            <Route path="/brands" element={<BrandsPage />} />
+            <Route path="/assets" element={<AssetsPage />} />
+            <Route path="/approvals" element={<ApprovalsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Route>
         </Route>
       </Routes>
 

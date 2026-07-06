@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronsUpDown,
   CircleCheck,
   FolderOpen,
   House,
+  LogOut,
   Megaphone,
   Package,
   PanelLeftClose,
@@ -15,7 +16,8 @@ import {
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "../../lib/cn";
-import { currentUser, workspace } from "../../data/mock";
+import { initialsOf, useSession } from "../../context/SessionContext";
+import { useClickOutside } from "../../hooks/useClickOutside";
 
 interface SidebarNavItem {
   id: string;
@@ -54,10 +56,7 @@ function NavRow({ item, collapsed }: { item: SidebarNavItem; collapsed: boolean 
       <span className="relative flex shrink-0 items-center justify-center">
         <Icon className="size-[18px]" aria-hidden />
         {collapsed && hasBadge && (
-          <span
-            aria-hidden
-            className="absolute -top-1 -right-1 size-2 rounded-full bg-accent"
-          />
+          <span aria-hidden className="absolute -top-1 -right-1 size-2 rounded-full bg-accent" />
         )}
       </span>
       {!collapsed && (
@@ -102,6 +101,16 @@ function NavRow({ item, collapsed }: { item: SidebarNavItem; collapsed: boolean 
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useClickOutside(menuRef, () => setMenuOpen(false), menuOpen);
+
+  const { session, profile, activeWorkspace, role, signOut } = useSession();
+
+  const displayName = profile?.name ?? session?.user.email ?? "Your account";
+  const email = profile?.email ?? session?.user.email ?? "";
+  const wsName = activeWorkspace?.name ?? "Personal workspace";
+  const roleLabel = role ? role.charAt(0).toUpperCase() + role.slice(1) : "Workspace";
 
   return (
     <aside
@@ -144,24 +153,19 @@ export function Sidebar() {
       <div className={cn("pb-3", collapsed ? "px-3" : "px-4")}>
         <button
           type="button"
-          title={collapsed ? `${workspace.name} — ${workspace.role}` : undefined}
-          aria-label={collapsed ? `${workspace.name} — ${workspace.role}` : undefined}
+          title={collapsed ? `${wsName} — ${roleLabel}` : undefined}
+          aria-label={collapsed ? `${wsName} — ${roleLabel}` : undefined}
           className={cn(
             "flex w-full items-center rounded-2xl border border-line bg-canvas text-left transition-colors hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-accent",
             collapsed ? "justify-center p-2" : "gap-3 px-3 py-2.5",
           )}
         >
-          <img
-            src={workspace.logoUrl}
-            alt=""
-            className="size-9 shrink-0 rounded-lg object-cover"
-            loading="lazy"
-          />
+          <WorkspaceAvatar name={wsName} logoUrl={activeWorkspace?.logo_url ?? null} />
           {!collapsed && (
             <>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">{workspace.name}</span>
-                <span className="block text-xs text-ink-muted">{workspace.role}</span>
+                <span className="block truncate text-sm font-semibold">{wsName}</span>
+                <span className="block text-xs text-ink-muted">{roleLabel}</span>
               </span>
               <ChevronDown className="size-4 shrink-0 text-ink-muted" aria-hidden />
             </>
@@ -184,26 +188,46 @@ export function Sidebar() {
       </nav>
 
       {/* User footer */}
-      <div className={cn("border-t border-line p-4", collapsed && "px-3")}>
+      <div ref={menuRef} className={cn("relative border-t border-line p-4", collapsed && "px-3")}>
+        {menuOpen && (
+          <div
+            className={cn(
+              "surface absolute z-20 p-1.5",
+              collapsed ? "bottom-2 left-full ml-2 w-44" : "right-4 bottom-full left-4 mb-2",
+            )}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                void signOut();
+              }}
+              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-danger transition-colors hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              <LogOut className="size-4" aria-hidden />
+              Sign out
+            </button>
+          </div>
+        )}
         <button
           type="button"
-          title={collapsed ? `${currentUser.name} — ${currentUser.email}` : undefined}
-          aria-label={collapsed ? `${currentUser.name} — ${currentUser.email}` : undefined}
+          onClick={() => setMenuOpen((current) => !current)}
+          title={collapsed ? `${displayName} — ${email}` : undefined}
+          aria-label={collapsed ? `${displayName} — ${email}` : undefined}
+          aria-expanded={menuOpen}
           className={cn(
             "flex w-full items-center rounded-2xl text-left transition-colors hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-accent",
             collapsed ? "justify-center p-1.5" : "gap-3 px-2 py-1.5",
           )}
         >
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-semibold text-accent-deep">
-            {currentUser.initials}
+            {initialsOf(profile?.name ?? email)}
           </span>
           {!collapsed && (
             <>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">{currentUser.name}</span>
-                <span className="block truncate text-xs text-ink-muted">
-                  {currentUser.email}
-                </span>
+                <span className="block truncate text-sm font-semibold">{displayName}</span>
+                <span className="block truncate text-xs text-ink-muted">{email}</span>
               </span>
               <ChevronsUpDown className="size-4 shrink-0 text-ink-muted" aria-hidden />
             </>
@@ -211,5 +235,23 @@ export function Sidebar() {
         </button>
       </div>
     </aside>
+  );
+}
+
+function WorkspaceAvatar({ name, logoUrl }: { name: string; logoUrl: string | null }) {
+  if (logoUrl) {
+    return (
+      <img
+        src={logoUrl}
+        alt=""
+        className="size-9 shrink-0 rounded-lg object-cover"
+        loading="lazy"
+      />
+    );
+  }
+  return (
+    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-ink text-sm font-bold text-white">
+      {name.charAt(0).toUpperCase()}
+    </span>
   );
 }
