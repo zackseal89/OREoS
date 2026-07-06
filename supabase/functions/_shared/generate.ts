@@ -2,7 +2,10 @@ import type { GoogleGenAI } from "@google/genai";
 import type { z } from "zod";
 import { MODELS } from "./gemini.ts";
 
-export type Part = { text: string } | { inlineData: { mimeType: string; data: string } };
+export type Part =
+  | { text: string }
+  | { inlineData: { mimeType: string; data: string } }
+  | { fileData: { fileUri: string; mimeType: string } };
 
 /**
  * Call Gemini for JSON output and validate against a Zod schema, with one
@@ -14,10 +17,11 @@ export async function generateJson<T>(
   ai: GoogleGenAI,
   parts: Part[],
   schema: z.ZodType<T>,
+  tools?: any[],
 ): Promise<T> {
   let lastError = "";
   for (let attempt = 0; attempt < 2; attempt++) {
-    const attemptParts: Part[] =
+    const attemptParts: any[] =
       attempt === 0
         ? parts
         : [
@@ -27,18 +31,24 @@ export async function generateJson<T>(
             },
           ];
 
-    const res = await ai.models.generateContent({
+    const model = ai.getGenerativeModel({
       model: MODELS.text,
-      contents: [{ role: "user", parts: attemptParts }],
-      // TODO(B2): attach `responseSchema` for schema-guaranteed output once the
-      // exact @google/genai schema object is pinned against a live call.
-      config: { responseMimeType: "application/json" },
+      tools: tools,
     });
 
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: attemptParts }],
+      generationConfig: { responseMimeType: "application/json" },
+    });
+
+    const response = await result.response;
+    const text = response.text();
+
     try {
-      return schema.parse(JSON.parse(res.text ?? ""));
+      return schema.parse(JSON.parse(text ?? ""));
     } catch (err) {
       lastError = String(err);
+      console.error(`Attempt ${attempt + 1} failed validation: ${lastError}`);
     }
   }
   throw new Error(`Gemini response failed validation twice: ${lastError}`);

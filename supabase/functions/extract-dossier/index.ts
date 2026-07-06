@@ -38,6 +38,8 @@ Deno.serve(async (req) => {
     // Assemble the multimodal request.
     const svc = serviceClient();
     const parts: Part[] = [];
+    const tools: any[] = [];
+
     if (product.source_type === "upload" && product.upload_path) {
       const { data: file } = await svc.storage.from("uploads").download(product.upload_path);
       if (file) {
@@ -49,11 +51,15 @@ Deno.serve(async (req) => {
         });
       }
     }
-    // TODO(B2): for source_type === "url", attach the `url_context` tool so
-    // Gemini reads the page directly (ARCHITECTURE §4.1) instead of scraping.
-    parts.push({ text: buildPrompt(product.name, product.source_url) });
 
-    const dossier = await generateJson(gemini(), parts, dossierSchema);
+    if (product.source_type === "url" && product.source_url) {
+      tools.push({ url_context: {} });
+      parts.push({ text: `Analyze the product at this URL: ${product.source_url}` });
+    }
+
+    parts.push({ text: buildPrompt(product.name) });
+
+    const dossier = await generateJson(gemini(), parts, dossierSchema, tools);
 
     // Pipeline-owned write: service role bypasses the products_guard lock on
     // status/dossier.
@@ -75,15 +81,20 @@ Deno.serve(async (req) => {
   }
 });
 
-function buildPrompt(name: string, url: string | null): string {
+function buildPrompt(name: string): string {
   return [
-    "You are a brand strategist. Analyze this product and extract its brand identity.",
-    `Product: ${name}.`,
-    url ? `Reference URL: ${url}.` : "",
-    "Return JSON with: colors (up to 8 hex values like #RRGGBB), typographyHeadline,",
-    "typographyBody, aestheticTag, valueProps (up to 8 short strings), and",
-    "voiceSummary (at most 600 characters).",
-  ]
-    .filter(Boolean)
-    .join(" ");
+    "You are an experienced marketing strategist. Analyze this product and extract its deep brand identity.",
+    `Product name: ${name}.`,
+    "Your goal is to define a brand that feels premium, consistent, and strategically positioned.",
+    "Return JSON with the following fields:",
+    "- colors: up to 8 hex values (#RRGGBB) that represent the brand's primary and secondary palette.",
+    "- typographyHeadline: a font name or style for headlines.",
+    "- typographyBody: a font name or style for body text.",
+    "- aestheticTag: a 2-3 word description of the visual style (e.g., 'Minimalist Scandi-Chic', 'Bold Neon Brutalism').",
+    "- valueProps: up to 8 short strings highlighting why a customer would care.",
+    "- voiceSummary: a detailed summary (up to 600 chars) of the brand's tone of voice.",
+    "- brandArchetype: the primary brand archetype (e.g., The Explorer, The Sage, The Magician).",
+    "- targetAudiencePrimary: a concise description of the main customer segment.",
+    "- marketPositioning: how this brand sits relative to competitors (e.g., 'Accessible luxury for Gen Z').",
+  ].join("\n");
 }
