@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import type { Database } from "../types/database";
 
 // The publishable ("anon") key is safe in the browser: every table is guarded by
 // Row-Level Security. Server-only secrets (service role, GEMINI_API_KEY) never
@@ -13,6 +14,4 @@ if (!url || !publishableKey) {
   );
 }
 
-// TODO(B0): add the generated `Database` generic once `supabase gen types
-// typescript` has produced src/types/database.ts — `createClient<Database>(...)`.
-export const supabase = createClient(url, publishableKey);
+export const supabase = createClient<Database>(url, publishableKey);
