@@ -23,10 +23,44 @@ The frontend is built out across dashboard, campaigns, products, assets library,
 
 ```bash
 npm install
-npm run dev      # start the dev server
-npm run build    # type-check (tsc -b) + production build
-npm run lint      # oxlint
+cp .env.example .env   # fill in VITE_SUPABASE_URL + VITE_SUPABASE_PUBLISHABLE_KEY
+npm run dev            # start the dev server
+npm run build          # type-check (tsc -b) + production build
+npm run lint           # oxlint
 ```
+
+## Backend (Supabase)
+
+The backend is scaffolded under [`supabase/`](supabase/) and follows [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) / [`docs/SCHEMA.md`](docs/SCHEMA.md). It is **not yet provisioned against a live project** — the app runs on mock data until the migrations are applied and the data hooks are wired (roadmap sprints B1+).
+
+```
+supabase/
+├── config.toml                    # local/remote CLI config
+├── migrations/
+│   ├── 0001_init.sql              # enums, tables, stat views, indexes
+│   ├── 0002_rls.sql               # role helpers + RLS policies (default deny)
+│   ├── 0003_triggers.sql          # state-machine guards + user bootstrap
+│   └── 0004_pipeline.sql          # pgmq queue, storage, realtime, cron tick
+└── functions/                     # Deno Edge Functions
+    ├── _shared/                   # clients, gemini, schemas, helpers
+    ├── extract-dossier/           # B2 — product → brand dossier
+    ├── generate-ideas/            # B3 — campaign → 5–7 ideas
+    └── generation-worker/         # B4 — queue → generated assets
+```
+
+### Backend setup (when provisioning)
+
+```bash
+npm i -g supabase                       # or use npx supabase ...
+supabase link --project-ref <ref>       # link a created project
+supabase db push                        # apply migrations
+supabase secrets set GEMINI_API_KEY=... # server-only, never a VITE_ var
+supabase functions deploy               # deploy the Edge Functions
+```
+
+Runtime prerequisites for the generation pipeline (see [`0004_pipeline.sql`](supabase/migrations/0004_pipeline.sql)): set Vault secrets `project_url` and `service_role_key` so the `pg_cron` tick can invoke `generation-worker`.
+
+**Security:** every table is default-deny RLS; server-only secrets live in Supabase secrets / Vault and never in the client bundle. The RLS + trigger policies are a reviewed **prototype** — run the Supabase security advisors and pgTAP tests before production traffic.
 
 ## Project layout
 

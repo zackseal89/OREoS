@@ -1,0 +1,68 @@
+# OREoS — Supabase local/remote configuration.
+# Buckets are created portably in migration 0004_pipeline.sql (works on remote too),
+# so they are intentionally not declared here.
+project_id = "oreos"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.pooler]
+enabled = false
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+# Local dev convenience — turn confirmations ON before production.
+enable_confirmations = false
+
+# Google OAuth — fill client_id/secret via env before enabling.
+[auth.external.google]
+enabled = false
+client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_GOOGLE_SECRET)"
+
+[edge_runtime]
+enabled = true
+# "oneshot" gives fast per-request isolation in local dev.
+policy = "oneshot"
+
+# Browser-invoked functions verify the caller's JWT.
+[functions.extract-dossier]
+verify_jwt = true
+
+[functions.generate-ideas]
+verify_jwt = true
+
+# Invoked by pg_cron via pg_net with the service-role key as bearer token.
+[functions.generation-worker]
+verify_jwt = true
