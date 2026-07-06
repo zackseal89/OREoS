@@ -1,5 +1,5 @@
-// generate-ideas — Sprint B3. Turns a campaign + its product dossier into 5–7
-// proposed content ideas, inserted as service role (clients cannot create ideas).
+// generate-ideas — Sprint B3. Turns a campaign + its product dossier into a
+// cohesive multi-platform campaign strategy and 5–7 proposed content ideas.
 import { corsHeaders } from "../_shared/cors.ts";
 import { json } from "../_shared/http.ts";
 import { serviceClient, userClient } from "../_shared/clients.ts";
@@ -34,9 +34,22 @@ Deno.serve(async (req) => {
       .single();
     if (error || !campaign) return json({ error: "campaign not found or not permitted" }, 403);
 
-    const { ideas } = await generateJson(gemini(), [{ text: buildPrompt(campaign) }], ideasSchema);
+    const { strategy, ideas } = await generateJson(
+      gemini(),
+      [{ text: buildPrompt(campaign) }],
+      ideasSchema,
+    );
 
     const svc = serviceClient();
+
+    // 1. Update campaign with the strategic direction
+    const { error: campaignError } = await svc
+      .from("campaigns")
+      .update({ strategy })
+      .eq("id", campaignId);
+    if (campaignError) throw campaignError;
+
+    // 2. Insert the ideas with their specific strategic rationales and creative directions
     const rows = ideas.map((idea) => ({
       campaign_id: campaignId,
       workspace_id: campaign.workspace_id,
@@ -44,33 +57,49 @@ Deno.serve(async (req) => {
       description: idea.description,
       format: idea.format,
       platforms: idea.platforms,
-      rationale: idea.rationale,
+      strategic_rationale: idea.strategicRationale,
+      creative_direction: idea.creativeDirection,
+      content_pillar: idea.contentPillar,
       status: "proposed",
     }));
+
     const { error: insertError } = await svc.from("campaign_ideas").insert(rows);
     if (insertError) throw insertError;
 
-    return json({ ok: true, count: rows.length });
+    return json({ ok: true, count: rows.length, strategy });
   } catch (err) {
     console.error("generate-ideas failed", err);
     return json({ error: String(err) }, 500);
   }
 });
 
-function buildPrompt(campaign: Record<string, unknown>): string {
-  const product = campaign.products as Record<string, unknown> | null;
+function buildPrompt(campaign: Record<string, any>): string {
+  const product = campaign.products as Record<string, any> | null;
   const dossier = product?.dossier;
   const platforms = Array.isArray(campaign.platforms) ? campaign.platforms.join(", ") : "any";
+
   return [
-    "You are a social media campaign strategist.",
-    `Campaign: ${campaign.name}. ${campaign.description ?? ""}`,
-    dossier ? `Brand dossier: ${JSON.stringify(dossier)}.` : "",
+    "You are an experienced marketing strategist. Your task is to design a cohesive multi-platform campaign.",
+    `Campaign name: ${campaign.name}.`,
+    `Campaign description: ${campaign.description ?? "N/A"}.`,
+    dossier ? `Brand dossier: ${JSON.stringify(dossier)}.` : "No brand dossier provided.",
     `Target platforms: ${platforms}.`,
-    "Propose 5 to 7 distinct content ideas. Return JSON of shape",
-    '{ "ideas": [{ "title", "description", "format", "platforms", "rationale" }] }.',
-    "format is one of image|video|carousel|story; platforms is a subset of",
-    "instagram|facebook|tiktok|linkedin.",
-  ]
-    .filter(Boolean)
-    .join(" ");
+    "",
+    "Phase 1: Determine the Strategy",
+    "- Define a specific campaign objective based on the product and brand.",
+    "- Identify the specific target audience segment for this campaign.",
+    "- Establish 3-5 content pillars that will guide the creative work.",
+    "- Provide a high-level creative direction for the entire campaign.",
+    "- Recommend an optimal posting schedule/frequency.",
+    "",
+    "Phase 2: Generate Content Ideas",
+    "- Propose 5 to 7 distinct content ideas that work together as a cohesive campaign, not isolated posts.",
+    "- For each idea, provide a strategic rationale explaining WHY it fits the campaign strategy and brand dossier.",
+    "- Provide specific creative direction for the asset generation phase (visual style, key elements, mood).",
+    "- Map each idea to one of the content pillars.",
+    "",
+    "Return JSON matching the required schema.",
+    "Format is one of image|video|carousel|story.",
+    "Platforms is a subset of instagram|facebook|tiktok|linkedin.",
+  ].join("\n");
 }
