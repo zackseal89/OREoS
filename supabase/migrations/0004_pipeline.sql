@@ -58,15 +58,21 @@ begin
     (to_jsonb(new) ->> 'workspace_id'),
     (to_jsonb(old) ->> 'workspace_id')
   )::uuid;
-  perform realtime.broadcast_changes(
-    'workspace:' || ws::text,  -- topic
-    tg_op,                     -- event
-    tg_op,                     -- operation
-    tg_table_name,             -- table
-    tg_table_schema,           -- schema
-    new,                       -- new record
-    old                        -- old record
-  );
+  -- Realtime is best-effort: an AFTER-trigger error would roll back the write
+  -- that caused it, so a broadcast failure must never propagate.
+  begin
+    perform realtime.broadcast_changes(
+      'workspace:' || ws::text,  -- topic
+      tg_op,                     -- event
+      tg_op,                     -- operation
+      tg_table_name,             -- table
+      tg_table_schema,           -- schema
+      new,                       -- new record
+      old                        -- old record
+    );
+  exception when others then
+    raise warning 'broadcast_workspace_change failed (non-fatal): %', sqlerrm;
+  end;
   return null;
 end $$;
 
