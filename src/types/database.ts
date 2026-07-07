@@ -41,6 +41,7 @@ export type Database = {
     Tables: {
       assets: {
         Row: {
+          brand_fit_score: number | null
           campaign_id: string
           copy_caption: string | null
           copy_hashtags: string[] | null
@@ -49,16 +50,20 @@ export type Database = {
           id: string
           idea_id: string | null
           name: string
+          performance_score: number | null
           platform: Database["public"]["Enums"]["platform"]
+          regeneration_options: Json | null
           scheduled_at: string | null
           size_label: string | null
           status: Database["public"]["Enums"]["asset_status"]
           storage_path: string
+          strategic_rationale: string | null
           tags: string[]
           type: Database["public"]["Enums"]["asset_type"]
           workspace_id: string
         }
         Insert: {
+          brand_fit_score?: number | null
           campaign_id: string
           copy_caption?: string | null
           copy_hashtags?: string[] | null
@@ -67,16 +72,20 @@ export type Database = {
           id?: string
           idea_id?: string | null
           name: string
+          performance_score?: number | null
           platform: Database["public"]["Enums"]["platform"]
+          regeneration_options?: Json | null
           scheduled_at?: string | null
           size_label?: string | null
           status?: Database["public"]["Enums"]["asset_status"]
           storage_path: string
+          strategic_rationale?: string | null
           tags?: string[]
           type: Database["public"]["Enums"]["asset_type"]
           workspace_id: string
         }
         Update: {
+          brand_fit_score?: number | null
           campaign_id?: string
           copy_caption?: string | null
           copy_hashtags?: string[] | null
@@ -85,11 +94,14 @@ export type Database = {
           id?: string
           idea_id?: string | null
           name?: string
+          performance_score?: number | null
           platform?: Database["public"]["Enums"]["platform"]
+          regeneration_options?: Json | null
           scheduled_at?: string | null
           size_label?: string | null
           status?: Database["public"]["Enums"]["asset_status"]
           storage_path?: string
+          strategic_rationale?: string | null
           tags?: string[]
           type?: Database["public"]["Enums"]["asset_type"]
           workspace_id?: string
@@ -189,37 +201,43 @@ export type Database = {
       campaign_ideas: {
         Row: {
           campaign_id: string
+          content_pillar: string | null
           created_at: string
+          creative_direction: string | null
           description: string
           format: Database["public"]["Enums"]["asset_type"]
           id: string
           platforms: Database["public"]["Enums"]["platform"][]
-          rationale: string | null
           status: Database["public"]["Enums"]["idea_status"]
+          strategic_rationale: string | null
           title: string
           workspace_id: string
         }
         Insert: {
           campaign_id: string
+          content_pillar?: string | null
           created_at?: string
+          creative_direction?: string | null
           description: string
           format: Database["public"]["Enums"]["asset_type"]
           id?: string
           platforms?: Database["public"]["Enums"]["platform"][]
-          rationale?: string | null
           status?: Database["public"]["Enums"]["idea_status"]
+          strategic_rationale?: string | null
           title: string
           workspace_id: string
         }
         Update: {
           campaign_id?: string
+          content_pillar?: string | null
           created_at?: string
+          creative_direction?: string | null
           description?: string
           format?: Database["public"]["Enums"]["asset_type"]
           id?: string
           platforms?: Database["public"]["Enums"]["platform"][]
-          rationale?: string | null
           status?: Database["public"]["Enums"]["idea_status"]
+          strategic_rationale?: string | null
           title?: string
           workspace_id?: string
         }
@@ -267,6 +285,7 @@ export type Database = {
           product_id: string | null
           start_at: string | null
           status: Database["public"]["Enums"]["campaign_status"]
+          strategy: Json | null
           tags: string[]
           updated_at: string
           workspace_id: string
@@ -283,6 +302,7 @@ export type Database = {
           product_id?: string | null
           start_at?: string | null
           status?: Database["public"]["Enums"]["campaign_status"]
+          strategy?: Json | null
           tags?: string[]
           updated_at?: string
           workspace_id: string
@@ -299,6 +319,7 @@ export type Database = {
           product_id?: string | null
           start_at?: string | null
           status?: Database["public"]["Enums"]["campaign_status"]
+          strategy?: Json | null
           tags?: string[]
           updated_at?: string
           workspace_id?: string
@@ -693,7 +714,24 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      increment_workspace_credits: {
+        Args: { amount: number; ws_id: string }
+        Returns: undefined
+      }
+      list_workspace_members: {
+        Args: { ws: string }
+        Returns: {
+          added_at: string
+          email: string
+          name: string
+          role: Database["public"]["Enums"]["team_role"]
+          user_id: string
+        }[]
+      }
+      pgmq_delete: {
+        Args: { msg_id: number; queue_name: string }
+        Returns: boolean
+      }
     }
     Enums: {
       asset_status:

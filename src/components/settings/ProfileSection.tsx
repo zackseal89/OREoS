@@ -1,23 +1,65 @@
-import { useState } from "react";
-import { currentUser } from "../../data/mock";
+import { useEffect, useState } from "react";
+import { supabase } from "../../lib/supabase";
+import { initialsOf, useSession } from "../../context/SessionContext";
 import { Field, inputClasses } from "../ui/Field";
 
-const TIMEZONES = [
-  "Africa/Nairobi (EAT)",
-  "Europe/London (GMT)",
-  "America/New_York (EST)",
-  "Asia/Dubai (GST)",
-];
+// Stored as plain IANA-ish strings (profiles.timezone); handle_new_user
+// defaults new users to Africa/Nairobi.
+const TIMEZONES = ["Africa/Nairobi", "Europe/London", "America/New_York", "Asia/Dubai"];
 
 const saveButtonClasses =
-  "rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-transform hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-accent-deep";
+  "rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-accent-deep";
 
 export function ProfileSection({ onSave }: { onSave: (message: string) => void }) {
-  const [name, setName] = useState(currentUser.name);
-  const [email, setEmail] = useState(currentUser.email);
-  const [timezone, setTimezone] = useState(TIMEZONES[0] ?? "");
-  const [currentPassword, setCurrentPassword] = useState("");
+  const { profile, role, refresh } = useSession();
+
+  const [name, setName] = useState("");
+  const [timezone, setTimezone] = useState(TIMEZONES[0]!);
   const [newPassword, setNewPassword] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  // Sync local form state once the profile loads.
+  useEffect(() => {
+    if (profile) {
+      setName(profile.name);
+      setTimezone(profile.timezone);
+    }
+  }, [profile]);
+
+  async function saveProfile() {
+    if (!profile) return;
+    setSavingProfile(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ name: name.trim(), timezone })
+      .eq("id", profile.id);
+    setSavingProfile(false);
+    if (error) {
+      onSave(error.message);
+      return;
+    }
+    await refresh();
+    onSave("Profile saved.");
+  }
+
+  async function updatePassword() {
+    if (newPassword.length < 6) {
+      onSave("New password must be at least 6 characters.");
+      return;
+    }
+    setSavingPassword(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setSavingPassword(false);
+    if (error) {
+      onSave(error.message);
+      return;
+    }
+    setNewPassword("");
+    onSave("Password updated.");
+  }
+
+  const roleLabel = role ? role.charAt(0).toUpperCase() + role.slice(1) : "—";
 
   return (
     <div className="space-y-6">
@@ -27,11 +69,11 @@ export function ProfileSection({ onSave }: { onSave: (message: string) => void }
 
         <div className="mt-5 flex items-center gap-4">
           <span className="flex size-16 items-center justify-center rounded-full bg-accent-soft text-xl font-semibold text-accent-deep">
-            {currentUser.initials}
+            {initialsOf(profile?.name ?? profile?.email)}
           </span>
           <button
             type="button"
-            onClick={() => onSave("Photo upload arrives with the Firebase Storage milestone.")}
+            onClick={() => onSave("Photo upload arrives with the Storage milestone.")}
             className="rounded-xl border border-line bg-card px-3.5 py-2 text-[13px] font-medium transition-transform hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-accent"
           >
             Change photo
@@ -47,13 +89,8 @@ export function ProfileSection({ onSave }: { onSave: (message: string) => void }
               className={inputClasses}
             />
           </Field>
-          <Field label="Email" hint="Used for sign-in and notifications.">
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className={inputClasses}
-            />
+          <Field label="Email" hint="Your sign-in address can't be changed here.">
+            <input type="email" value={profile?.email ?? ""} disabled className={inputClasses} />
           </Field>
           <Field label="Timezone" hint="Post scheduling uses this timezone.">
             <select
@@ -69,17 +106,18 @@ export function ProfileSection({ onSave }: { onSave: (message: string) => void }
             </select>
           </Field>
           <Field label="Workspace role">
-            <input type="text" value="Owner" disabled className={inputClasses} />
+            <input type="text" value={roleLabel} disabled className={inputClasses} />
           </Field>
         </div>
 
         <div className="mt-6 flex justify-end">
           <button
             type="button"
-            onClick={() => onSave(`Profile saved for ${name.trim() || "you"}.`)}
+            onClick={saveProfile}
+            disabled={savingProfile || !profile}
             className={saveButtonClasses}
           >
-            Save changes
+            {savingProfile ? "Saving…" : "Save changes"}
           </button>
         </div>
       </section>
@@ -90,16 +128,7 @@ export function ProfileSection({ onSave }: { onSave: (message: string) => void }
           Choose a strong password you don't use anywhere else.
         </p>
         <div className="mt-5 grid gap-5 sm:grid-cols-2">
-          <Field label="Current password">
-            <input
-              type="password"
-              value={currentPassword}
-              onChange={(event) => setCurrentPassword(event.target.value)}
-              autoComplete="current-password"
-              className={inputClasses}
-            />
-          </Field>
-          <Field label="New password" hint="At least 8 characters.">
+          <Field label="New password" hint="At least 6 characters.">
             <input
               type="password"
               value={newPassword}
@@ -112,18 +141,11 @@ export function ProfileSection({ onSave }: { onSave: (message: string) => void }
         <div className="mt-6 flex justify-end">
           <button
             type="button"
-            onClick={() => {
-              if (newPassword.length < 8) {
-                onSave("New password must be at least 8 characters.");
-                return;
-              }
-              setCurrentPassword("");
-              setNewPassword("");
-              onSave("Password updated.");
-            }}
+            onClick={updatePassword}
+            disabled={savingPassword}
             className={saveButtonClasses}
           >
-            Update password
+            {savingPassword ? "Updating…" : "Update password"}
           </button>
         </div>
       </section>
