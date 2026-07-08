@@ -552,6 +552,7 @@ export type Database = {
           email: string
           id: string
           name: string
+          notification_prefs: Json
           timezone: string
         }
         Insert: {
@@ -559,6 +560,7 @@ export type Database = {
           email: string
           id: string
           name: string
+          notification_prefs?: Json
           timezone?: string
         }
         Update: {
@@ -566,6 +568,7 @@ export type Database = {
           email?: string
           id?: string
           name?: string
+          notification_prefs?: Json
           timezone?: string
         }
         Relationships: []
