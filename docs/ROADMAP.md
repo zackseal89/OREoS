@@ -1,55 +1,54 @@
-# OREoS — Backend Roadmap, v2 (Supabase + Gemini API)
+# OREoS — Roadmap v3 (GTM-first)
 
-**Phase 2 deliverable** · 2026-07-05 · Supersedes the Firebase roadmap (archived). Same discipline: one sprint = one approval gate = one demo, measured by **which mock file dies**. A bonus of this stack: the Supabase connector in this workspace lets me provision the project, apply migrations, deploy Edge Functions, and run the security advisors directly — no console clicking required from you.
+**2026-07-08** · Supersedes v2 (same stack: Supabase + Gemini API). Reordered for fastest path to a marketable launch. Two structural changes from v2:
 
-## Prerequisites
-- Supabase organization (free tier covers B0–B3 dev) — I can create the project via the connector once you confirm org/region
-- Gemini API key (AI Studio) → stored via `supabase secrets set GEMINI_API_KEY` (never in the repo)
-- Vercel account for SPA hosting (connector available here too; can wait until B6)
+1. **Deploy early, not last.** Vercel deploy moves from B6 to Phase 0 — every sprint after it is demoable on a public URL, and auth/redirect flows get exercised against the real domain from day one.
+2. **Human-in-the-loop gates are MVP scope.** OREoS is HITL by design: AI proposes, the human disposes, at every stage. The full judgment chain at launch: *AI extracts dossier → human reviews/edits → AI pitches ideas → human approves → AI generates assets → human reviews in Approvals → only then export.* The DB already enforces this via status state-machine guard triggers (`0003_triggers.sql`) — keep every new AI pipeline behind a reviewable status, never direct-to-final.
 
-## Sprints
+## Cut from GTM MVP (deliberate, revisit post-launch)
 
-### B0 — Provision + schema *(½–1 day)*
-Create `oreos` Supabase project · apply migrations `0001_init` → `0004_pipeline` from [SCHEMA.md](SCHEMA.md) (tables, views, RLS, guard triggers, pgmq, cron, broadcast triggers, buckets) · `supabase gen types typescript` → `src/types/database.ts` · `src/lib/supabase.ts` client (publishable key) · seed script porting today's mock data so the UI stays populated · **run security advisors**; README setup section.
-**Demo:** UI unchanged, but stat tiles read `workspace_stats`/`campaign_stats` views. **Mock killed:** none yet (foundation) — but the consistency invariant is now enforced by the database.
-
-### B1 — Auth + tenancy *(Priority 1 begins)*
-Sign-in/sign-up screens (email/password + Google), designed to the existing design system · `SessionContext` (session, workspace, role) + route guard · `handle_new_user` trigger creates profile + personal workspace · Team section live (invites, role changes, removal under RLS) · pgTAP tests for the member policies.
-**Demo:** real sign-up → own workspace; a second account proves tenant isolation. **Mocks killed:** `currentUser`, `workspace`, `teamMembers`.
-
-### B2 — Products + dossier extraction ⭐ *(first Gemini call)*
-Upload from `ProductIntakePage` → `uploads` bucket · **`extract-dossier` Edge Function**: image path or URL → **gemini-3.5-flash** `generateContent` with ProductDossier `responseSchema`; **URL ingestion uses the `url_context` tool** (Gemini reads the page itself — the hand-rolled scraper and its risk are deleted from this plan) → Zod validate → service-role update (`dossier`, `status`) · broadcast refreshes the products list; existing skeletons cover `processing`.
-**Demo:** real product photo or URL → live dossier in `ProductDetailPage`. **Mock killed:** `products.ts`.
-
-### B3 — Campaigns + ideation + approval *(Priority 1 complete)*
-Campaign CRUD against Postgres (existing page logic intact) · `generate-ideas` Edge Function → `campaign_ideas` rows · approve/reject = client updates constrained by `ideas_guard` · `CreateCampaignModal` wired end-to-end (product → campaign → pitched ideas).
-**Demo:** dossier → 5–7 idea cards → batch approval, persistent across devices. **Mock killed:** `campaigns.ts`.
-
-### B4 — Generation engine ⭐ *(Priority 2 begins)*
-`approve-and-generate` (RPC or thin function): credit check → `generation_jobs` rows + `pgmq.send` fan-out · cron tick → `generation-worker`: **gemini-3.1-flash-image** (Interactions API, product/brand reference images) + 3.5-flash copy → `generated` bucket + `assets` row (`pending-review`) · progress UI from `generation_jobs` via broadcast · retries via visibility timeout, `attempts ≤ 3`, unique `(campaign, idea, format)` idempotency.
-**Demo:** approve 3 ideas → watch branded assets stream into the library. **Mock killed:** `assets.ts` (its consistency contract now lives in the views).
-**Risks:** image-model rate limits → 1 job/invocation + backoff; cost → `credits_used` incremented per job, gated before enqueue.
-
-### B5 — Approvals, scheduling, notifications, dashboard
-Approvals page = `status = 'pending-review'` query · asset transitions + `scheduled_at` (rule-guarded) · pipeline writes `notifications` (broadcast → bell) · dashboard KPIs + upcoming posts from live views/queries.
-**Demo:** the whole loop is real; the 356-style invariant holds on live data by construction. **Mocks killed:** `mock.ts`, most of `settings.ts`.
-
-### B6 — Hardening + launch
-Security advisors + pgTAP attack tests (cross-tenant read/write, role escalation, status-jump, counter tamper) · Edge Function logging pass · rate-limit headers on functions · Vercel deploy (SPA + env) · Lighthouse/bundle check · README finalized (local dev with `supabase start`, migrations, secrets, deploy).
-**Demo:** production URL, full flow on live services.
-
-## Risk Register (v2)
-
-| Risk | Sprint | Mitigation |
+| Cut | Why | Replacement |
 |---|---|---|
-| Schema-invalid Gemini JSON | B2/B4 | `responseSchema` + Zod + one corrective retry → `needs-review`; never partial writes |
-| Image-model rate limits / spend caps | B4 | pgmq sequential worker, visibility-timeout retries, credits gate |
-| RLS gap leaks tenant data | B0+ | pgTAP policy tests + security advisors every sprint; guard triggers for old/new checks |
-| Edge Function wall-clock limit | B4 | ≤ 1 image per invocation; cron fans out invocations |
-| `url_context` fails on odd storefronts | B2 | fallback prompt-only extraction → `needs-review`; image upload remains primary path |
-| Realtime misuse | B5 | broadcast-from-DB only; private channels with `realtime.messages` RLS |
+| Social OAuth publishing | Meta/TikTok app review takes weeks–months | Download assets + copy captions (approval-gated) |
+| Analytics page | Meaningless without published posts | "Coming soon" state |
+| Calendar, Media Library, Create Post editor, AI Studio pages | Great reference designs (`app ui/`), not needed for the core promise | Fast-follows post-launch |
+| Business-first onboarding wizard (7-step brand discovery) | Product-first intake already feeds B2 | v1.1 upgrade |
+| Multi-org / super-admin layer | Out of scope by decision (2026-07-08) | Single-workspace tenancy stands |
 
-## Open decisions (defaults applied on "go")
-1. **Supabase org + project name** — default: project `oreos` in your existing org.
-2. **Region** — default: `eu-central-1` (Frankfurt; lowest latency to Nairobi among Supabase regions — confirm at creation).
-3. **Auth screens** — default: I design them to the existing design system.
+## Phases
+
+### Phase 0 — Land the base, get public *(~1 day)*
+Commit in-flight react-query work (query-key factory, `useRealtimeInvalidate`, provider) · apply `0009_notification_prefs` to live DB · regen types · Vercel deploy (SPA rewrites, `VITE_SUPABASE_*` env, Supabase auth redirect URLs for the production domain) · verify signup round-trip on the real domain.
+**Demo:** the current app, live on a shareable URL.
+
+### Phase 1 — First magic moment (B2: dossier extraction) ⭐ *(~2–3 days, highest technical risk — goes first)*
+`ProductIntakePage` → `uploads` bucket / URL → `extract-dossier` Edge Function: **gemini-3.5-flash** with ProductDossier `responseSchema`; URL path uses the `url_context` tool → Zod validate → service-role write → live dossier in `ProductDetailPage`.
+**HITL gate:** user reviews and can edit the dossier before it becomes generation ground truth — extraction output is never silently accepted. (Also replaces the temporary `bootstrapBrandIfNeeded` demo seed.)
+**Demo:** stranger signs up on the public URL, pastes a product URL, sees a real AI brand dossier, edits it. **Mock killed:** `products.ts`.
+
+### Phase 2 — Ideas + approval (B3) *(~2 days)*
+Campaign CRUD against Postgres (page logic exists) · `generate-ideas` → `campaign_ideas` rows → idea cards → batch approve/reject constrained by `ideas_guard` · `CreateCampaignModal` wired end-to-end.
+**HITL gate:** nothing generates until ideas are explicitly approved.
+**Demo:** dossier → 5–7 idea cards → approval, persistent across devices. **Mock killed:** `campaigns.ts`.
+
+### Phase 3 — Generation engine + Approvals (B4) ⭐ *(~3–4 days)*
+Approve → credit check → `generation_jobs` + `pgmq.send` fan-out · cron tick → `generation-worker`: **gemini-3.1-flash-image** (product/brand reference images) + 3.5-flash copy → `generated` bucket + `assets` rows in **`pending-review`** · progress UI via broadcast (`useRealtimeInvalidate`) · retries via visibility timeout, `attempts ≤ 3`, idempotency on `(campaign, idea, format)`.
+**HITL gate:** Approvals page goes live in this phase (elevated from v2's B5) — assets land in `pending-review`; **download/export/copy-caption is gated on `approved`**.
+**Demo:** approve 3 ideas → watch branded assets stream in → review in Approvals → export. **Mock killed:** `assets.ts`.
+
+### Phase 4 — Launch wrap *(~2–3 days)*
+Dashboard/notifications fully live + credits gate with upgrade CTA · landing page polish to the `app ui/` reference + Google OAuth (biggest signup-conversion lever) · hardening: security advisors, pgTAP cross-tenant/role-escalation/status-jump tests, Edge Function rate limits & logging · README finalized.
+**Demo:** production URL, full HITL loop on live services → **launch**.
+
+## Risk register
+
+| Risk | Phase | Mitigation |
+|---|---|---|
+| Schema-invalid Gemini JSON | 1/3 | `responseSchema` + Zod + one corrective retry → `needs-review`; never partial writes |
+| Image-model rate limits / spend | 3 | pgmq sequential worker, visibility-timeout retries, credits gate before enqueue |
+| RLS gap leaks tenant data | all | pgTAP policy tests + security advisors every phase; guard triggers |
+| Edge Function wall-clock limit | 3 | ≤ 1 image per invocation; cron fans out |
+| `url_context` fails on odd storefronts | 1 | fallback prompt-only extraction → `needs-review`; image upload remains primary |
+| Auth redirect breakage on prod domain | 0 | deploy first, verify signup round-trip before building on top |
+
+**Estimated total: ~2–2.5 weeks** of focused work to a marketable product.

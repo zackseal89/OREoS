@@ -67,6 +67,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     if (!activeWorkspace) return;
+    const workspaceId = activeWorkspace.id;
 
     let active = true;
     setLoading(true);
@@ -77,25 +78,25 @@ export function DashboardPage() {
           supabase
             .from("workspace_stats")
             .select("*")
-            .eq("workspace_id", activeWorkspace.id)
+            .eq("workspace_id", workspaceId)
             .maybeSingle(),
           supabase
             .from("assets")
             .select("*")
-            .eq("workspace_id", activeWorkspace.id)
+            .eq("workspace_id", workspaceId)
             .in("status", ["scheduled", "pending-review"])
             .order("scheduled_at", { ascending: true, nullsFirst: false })
             .limit(5),
           supabase
             .from("notifications")
             .select("*")
-            .eq("workspace_id", activeWorkspace.id)
+            .eq("workspace_id", workspaceId)
             .order("created_at", { ascending: false })
             .limit(5),
           supabase
             .from("campaigns")
             .select("*, campaign_stats(*)")
-            .eq("workspace_id", activeWorkspace.id)
+            .eq("workspace_id", workspaceId)
             .neq("status", "archived")
             .order("updated_at", { ascending: false })
             .limit(4),
