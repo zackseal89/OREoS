@@ -10,13 +10,10 @@ import {
   Tag,
 } from "lucide-react";
 import { cn } from "../lib/cn";
-import { products } from "../data/products";
-import { campaigns } from "../data/campaigns";
-import { mockExtractDossier } from "../data/products";
+import { useProduct, useCampaigns, useNotifications } from "../hooks/useData";
 import { TopNav } from "../components/layout/TopNav";
 import { ProductStatusBadge } from "../components/ui/Badge";
 import { useToast } from "../hooks/useToast";
-import { notifications } from "../data/mock";
 
 const TABS = [
   { id: "dossier", label: "Brand Dossier" },
@@ -24,21 +21,33 @@ const TABS = [
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
-// We use the mock dossier for every product since we don't persist dossiers in mock data
-const DOSSIER = mockExtractDossier();
-
 export function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast, showToast } = useToast();
   const [tab, setTab] = useState<TabId>("dossier");
 
-  const product = useMemo(() => products.find((p) => p.id === id), [id]);
+  const { data: product, isLoading } = useProduct(id);
+  const { data: notifications = [] } = useNotifications();
+  const { data: campaigns = [] } = useCampaigns();
 
   const linkedCampaigns = useMemo(
     () => campaigns.filter((c) => c.product === product?.name),
-    [product],
+    [campaigns, product],
   );
+
+  const DOSSIER = product?.dossier;
+
+  if (isLoading) {
+    return (
+      <>
+        <TopNav notificationCount={notifications.length} />
+        <main className="flex flex-1 items-center justify-center min-h-[300px]">
+          <div className="size-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+        </main>
+      </>
+    );
+  }
 
   if (!product) {
     return (
@@ -186,6 +195,17 @@ export function ProductDetailPage() {
                   extraction is complete.
                 </p>
               </div>
+            ) : !DOSSIER ? (
+              <div className="surface flex flex-col items-center gap-4 py-16 text-center">
+                <span className="flex size-14 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                  <Sparkles className="size-6" aria-hidden />
+                </span>
+                <h3 className="text-lg font-semibold">No dossier available</h3>
+                <p className="max-w-sm text-sm text-ink-muted">
+                  Extraction needs another look. Re-run it from the product intake to generate the
+                  brand dossier.
+                </p>
+              </div>
             ) : (
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
                 {/* Asset thumbnails */}
@@ -193,16 +213,20 @@ export function ProductDetailPage() {
                   <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
                     Extracted Assets
                   </h2>
-                  <div className="mt-4 grid grid-cols-2 gap-3">
-                    {DOSSIER.assetUrls.map((url) => (
-                      <div
-                        key={url}
-                        className="aspect-square overflow-hidden rounded-xl bg-neutral-100"
-                      >
-                        <img src={url} alt="" className="size-full object-cover" loading="lazy" />
-                      </div>
-                    ))}
-                  </div>
+                  {DOSSIER.assetUrls.length === 0 ? (
+                    <p className="mt-4 text-sm text-ink-muted">No product images were extracted.</p>
+                  ) : (
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      {DOSSIER.assetUrls.map((url, i) => (
+                        <div
+                          key={`${i}-${url}`}
+                          className="aspect-square overflow-hidden rounded-xl bg-neutral-100"
+                        >
+                          <img src={url} alt="" className="size-full object-cover" loading="lazy" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Dossier details */}

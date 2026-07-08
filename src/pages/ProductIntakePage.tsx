@@ -1,9 +1,31 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { OnboardingStepper } from "../components/intake/OnboardingStepper";
 import { IntakeFormPanel } from "../components/intake/IntakeFormPanel";
 import { IntakePreviewPanel } from "../components/intake/IntakePreviewPanel";
-import { mockExtractDossier } from "../data/products";
+import { supabase } from "../lib/supabase";
+import { queryKeys } from "../lib/queryKeys";
+import { errorMessage, functionErrorMessage } from "../lib/errors";
+import { useSession } from "../context/SessionContext";
 import type { IntakeStage, ProductDossier, ProductSourceType } from "../types";
+
+/** Poll the product row until the pipeline leaves the `processing` state. */
+async function pollProduct(
+  productId: string,
+  { tries = 30, intervalMs = 2000 } = {},
+): Promise<{ status: string; dossier: unknown } | null> {
+  for (let i = 0; i < tries; i++) {
+    const { data } = await supabase
+      .from("products")
+      .select("status, dossier")
+      .eq("id", productId)
+      .maybeSingle();
+    if (data && data.status !== "processing") return data;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return null;
+}
 
 const EXTRACTION_CAPTIONS = [
   "Reading brand colors…",
@@ -23,13 +45,18 @@ function nameFromFile(file: File): string {
 }
 
 export function ProductIntakePage() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { activeWorkspace } = useSession();
   const [stage, setStage] = useState<IntakeStage>("input");
   const [mode, setMode] = useState<ProductSourceType>("url");
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [dossier, setDossier] = useState<ProductDossier | null>(null);
   const [productName, setProductName] = useState("");
+  const [productId, setProductId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [captionIndex, setCaptionIndex] = useState(0);
 
   const canSubmit = mode === "url" ? url.trim().length > 0 : file !== null;
@@ -44,21 +71,72 @@ export function ProductIntakePage() {
     return () => clearInterval(timer);
   }, [stage]);
 
-  const handleExtract = () => {
-    setProductName(mode === "url" ? nameFromUrl(url) : nameFromFile(file!));
+  const handleExtract = async () => {
+    if (!activeWorkspace) return;
+    const name = mode === "url" ? nameFromUrl(url) : nameFromFile(file!);
+    setProductName(name);
+    setError(null);
     setStage("extracting");
-    setTimeout(() => {
-      setDossier(mockExtractDossier());
-      setStage("review");
-    }, 2200);
+
+    try {
+      // Uploaded images go to the workspace-scoped uploads bucket first.
+      let uploadPath: string | null = null;
+      if (mode === "upload" && file) {
+        uploadPath = `${activeWorkspace.id}/${crypto.randomUUID()}-${file.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from("uploads")
+          .upload(uploadPath, file);
+        if (uploadError) throw new Error(`Image upload failed: ${errorMessage(uploadError)}`);
+      }
+
+      const { data: inserted, error: insertError } = await supabase
+        .from("products")
+        .insert({
+          workspace_id: activeWorkspace.id,
+          name,
+          source_type: mode,
+          source_url: mode === "url" ? url.trim() : null,
+          upload_path: uploadPath,
+          status: "processing",
+        })
+        .select("id")
+        .single();
+      if (insertError) throw new Error(`Couldn't create product: ${errorMessage(insertError)}`);
+      setProductId(inserted.id);
+
+      // Kick off extraction (Firecrawl scrape → Gemini dossier), then poll.
+      const { error: fnError } = await supabase.functions.invoke("extract-dossier", {
+        body: { productId: inserted.id },
+      });
+      // Capture the function's own error body (e.g. a missing API key) up front.
+      const fnMessage = fnError ? await functionErrorMessage(fnError) : "";
+
+      const final = await pollProduct(inserted.id);
+
+      if (final?.status === "ready" && final.dossier) {
+        setDossier(final.dossier as unknown as ProductDossier);
+        void queryClient.invalidateQueries({ queryKey: queryKeys.products(activeWorkspace.id) });
+        setStage("review");
+      } else {
+        throw new Error(
+          fnMessage ||
+            "The dossier couldn't be generated for this product. Please try again or use a different source.",
+        );
+      }
+    } catch (err) {
+      setError(errorMessage(err));
+      setStage("input");
+    }
   };
 
   const handleSave = () => {
+    // The product is already persisted; confirm and move on.
     setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
-      setStage("saved");
-    }, 500);
+    if (activeWorkspace) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.products(activeWorkspace.id) });
+    }
+    setSaving(false);
+    setStage("saved");
   };
 
   const handleRestart = () => {
@@ -67,6 +145,13 @@ export function ProductIntakePage() {
     setFile(null);
     setDossier(null);
     setProductName("");
+    setProductId(null);
+    setError(null);
+  };
+
+  const handleViewProduct = () => {
+    if (productId) navigate(`/products/${productId}`);
+    else navigate("/products");
   };
 
   return (
@@ -86,7 +171,9 @@ export function ProductIntakePage() {
           productName={productName}
           onSave={handleSave}
           onRestart={handleRestart}
+          onViewProduct={handleViewProduct}
           saving={saving}
+          error={error}
         />
       </div>
 

@@ -9,7 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { formatDuration } from "../../data/assets";
+import { formatDuration } from "../../lib/format";
 import { AssetStatusBadge } from "../ui/Badge";
 import { PlatformIcon } from "../ui/PlatformIcon";
 import type { Asset } from "../../types";

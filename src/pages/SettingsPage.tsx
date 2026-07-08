@@ -2,8 +2,6 @@ import { Bell, CircleHelp } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "../lib/cn";
 import { useToast } from "../hooks/useToast";
-import { BillingSection } from "../components/settings/BillingSection";
-import { ConnectedAccountsSection } from "../components/settings/ConnectedAccountsSection";
 import { NotificationsSection } from "../components/settings/NotificationsSection";
 import { ProfileSection } from "../components/settings/ProfileSection";
 import { TeamSection } from "../components/settings/TeamSection";
@@ -14,8 +12,6 @@ const TABS = [
   { id: "workspace", label: "Workspace" },
   { id: "team", label: "Team" },
   { id: "notifications", label: "Notifications" },
-  { id: "accounts", label: "Connected Accounts" },
-  { id: "billing", label: "Billing" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -61,7 +57,7 @@ export function SettingsPage() {
         {/* Header */}
         <h1 className="text-[34px] font-bold tracking-tight">Settings</h1>
         <p className="mt-1 text-[15px] text-ink-muted">
-          Manage your profile, workspace, team and billing.
+          Manage your profile, workspace and team.
         </p>
 
         {/* Tabs */}
@@ -103,8 +99,6 @@ export function SettingsPage() {
           {tab === "workspace" && <WorkspaceSection onSave={showToast} />}
           {tab === "team" && <TeamSection onSave={showToast} />}
           {tab === "notifications" && <NotificationsSection />}
-          {tab === "accounts" && <ConnectedAccountsSection onSave={showToast} />}
-          {tab === "billing" && <BillingSection onSave={showToast} />}
         </div>
       </div>
 

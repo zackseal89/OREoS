@@ -57,12 +57,18 @@ enabled = true
 policy = "oneshot"
 
 # Browser-invoked functions verify the caller's JWT.
+# import_map points at the shared deno.json so the deploy bundler resolves bare
+# npm: specifiers (@supabase/supabase-js, @google/genai, zod). Path is relative
+# to this config.toml (the supabase/ dir).
 [functions.extract-dossier]
 verify_jwt = true
+import_map = "./functions/deno.json"
 
 [functions.generate-ideas]
 verify_jwt = true
+import_map = "./functions/deno.json"
 
 # Invoked by pg_cron via pg_net with the service-role key as bearer token.
 [functions.generation-worker]
 verify_jwt = true
+import_map = "./functions/deno.json"

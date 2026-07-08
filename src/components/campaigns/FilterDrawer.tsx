@@ -128,13 +128,6 @@ export function FilterDrawer({
           </section>
 
           <section className="space-y-2 border-t border-line pt-5">
-            <SectionTitle>Brand</SectionTitle>
-            <select className={selectClasses} defaultValue="kafe-iko">
-              <option value="kafe-iko">Kafe iko Coffee</option>
-            </select>
-          </section>
-
-          <section className="space-y-2 border-t border-line pt-5">
             <SectionTitle>Product</SectionTitle>
             <select
               value={filters.product}

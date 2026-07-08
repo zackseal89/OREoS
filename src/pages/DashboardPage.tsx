@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { AiInsights } from "../components/dashboard/AiInsights";
 import { KpiCard } from "../components/dashboard/KpiCard";
 import { NotificationsCard } from "../components/dashboard/NotificationsCard";
 import { QuickActions } from "../components/dashboard/QuickActions";
@@ -8,6 +7,7 @@ import { UpcomingPosts } from "../components/dashboard/UpcomingPosts";
 import { TopNav } from "../components/layout/TopNav";
 import { useSession } from "../context/SessionContext";
 import { supabase } from "../lib/supabase";
+import { coverFor } from "../lib/cover";
 import type { CampaignSummary, KpiStat, NotificationItem, ScheduledPost } from "../types";
 
 const quickActions = [
@@ -16,33 +16,6 @@ const quickActions = [
   { id: "qa-url", title: "Upload Product URL", subtitle: "Extract assets from product" },
   { id: "qa-chat", title: "AI Chat", subtitle: "Ask OREoS anything" },
   { id: "qa-calendar", title: "View Calendar", subtitle: "See all scheduled posts" },
-];
-
-const aiInsights = [
-  {
-    id: "insight-platform",
-    tone: "pink" as const,
-    message: "Best performing platform for you is Instagram",
-    detail: "+28% engagement",
-  },
-  {
-    id: "insight-content",
-    tone: "blue" as const,
-    message: "Your audience engages most with educational content",
-    detail: "+35% vs other types",
-  },
-  {
-    id: "insight-time",
-    tone: "green" as const,
-    message: "Optimal posting time for you is between 6PM – 9PM EAT",
-    detail: "Based on last 30 days",
-  },
-  {
-    id: "insight-reels",
-    tone: "amber" as const,
-    message: "Reels get 2.4× more reach than image posts",
-    detail: "Try short-form video",
-  },
 ];
 
 function greetingForHour(hour: number): string {
@@ -122,7 +95,7 @@ export function DashboardPage() {
               status: post.status === "pending-review" ? "pending-review" : "scheduled",
               thumbnailUrl: post.storage_path
                 ? supabase.storage.from("generated").getPublicUrl(post.storage_path).data.publicUrl
-                : "https://images.unsplash.com/photo-1511920170033-f8396924c348?auto=format&fit=crop&w=160&q=70",
+                : coverFor(post.id),
             };
           });
           setUpcoming(mappedPosts);
@@ -158,7 +131,7 @@ export function DashboardPage() {
               platforms: camp.platforms,
               assetCount: statsObj.assets,
               scheduleLabel: `${statsObj.scheduled} Scheduled`,
-              coverUrl: "https://images.unsplash.com/photo-1511920170033-f8396924c348?auto=format&fit=crop&w=480&q=70",
+              coverUrl: coverFor(camp.id),
             };
           });
           setCampaignsList(mappedCamps);
@@ -240,9 +213,6 @@ export function DashboardPage() {
             <RecentCampaigns campaigns={campaignsList} />
             <QuickActions actions={quickActions} />
           </div>
-
-          {/* AI insights */}
-          <AiInsights insights={aiInsights} />
         </div>
       </main>
     </>

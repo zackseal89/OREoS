@@ -1,10 +1,19 @@
 import { useState } from "react";
-import { notificationPrefs as seedPrefs } from "../../data/settings";
 import { Toggle } from "../ui/Toggle";
 import type { NotificationPref } from "../../types";
 
+// Which events OREoS can notify on. Defaults; per-user persistence lands with the
+// notification_prefs table wiring.
+const DEFAULT_PREFS: NotificationPref[] = [
+  { id: "pref-published", label: "Post published", description: "When a scheduled post goes live on any platform.", enabled: true },
+  { id: "pref-failed", label: "Post failed", description: "When a post could not be published and needs attention.", enabled: true },
+  { id: "pref-ai", label: "AI recommendations", description: "When OREoS finds a new campaign or content opportunity.", enabled: true },
+  { id: "pref-digest", label: "Weekly performance digest", description: "A summary of your top posts every Monday.", enabled: false },
+  { id: "pref-product", label: "Product updates", description: "Occasional news about new OREoS features.", enabled: false },
+];
+
 export function NotificationsSection() {
-  const [prefs, setPrefs] = useState<NotificationPref[]>(seedPrefs);
+  const [prefs, setPrefs] = useState<NotificationPref[]>(DEFAULT_PREFS);
 
   const toggle = (id: string, enabled: boolean) => {
     setPrefs((current) =>

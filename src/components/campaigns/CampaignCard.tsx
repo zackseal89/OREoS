@@ -13,7 +13,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { cn } from "../../lib/cn";
 import { useClickOutside } from "../../hooks/useClickOutside";
-import { FALLBACK_COVER } from "../../data/campaigns";
+import { coverFor } from "../../lib/cover";
 import { CampaignStatusBadge } from "../ui/Badge";
 import { Highlight } from "../ui/Highlight";
 import { PlatformIcon } from "../ui/PlatformIcon";
@@ -95,7 +95,7 @@ export function CampaignCard({
           alt=""
           loading="lazy"
           onError={(event) => {
-            event.currentTarget.src = FALLBACK_COVER;
+            event.currentTarget.src = coverFor(campaign.id);
           }}
           className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
         />

@@ -115,7 +115,7 @@ export function AuthPage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     autoComplete="name"
-                    placeholder="Zack Mwangi"
+                    placeholder="Your name"
                     className={inputClasses}
                   />
                 </Field>

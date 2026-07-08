@@ -37,7 +37,7 @@ const STATS: StatDef[] = [
     icon: Megaphone,
     tone: "green",
     value: (list) => String(list.length),
-    sub: { text: "2 from last month", trend: true },
+    sub: { text: "All campaigns" },
   },
   {
     id: "active",
@@ -45,7 +45,7 @@ const STATS: StatDef[] = [
     icon: Zap,
     tone: "violet",
     value: (list) => String(list.filter((c) => c.status === "active").length),
-    sub: { text: "1 from last month", trend: true },
+    sub: { text: "Currently running" },
   },
   {
     id: "completed",
@@ -53,7 +53,7 @@ const STATS: StatDef[] = [
     icon: CircleCheck,
     tone: "blue",
     value: (list) => String(list.filter((c) => c.status === "completed").length),
-    sub: { text: "3 from last month", trend: true },
+    sub: { text: "Finished" },
   },
   {
     id: "drafts",

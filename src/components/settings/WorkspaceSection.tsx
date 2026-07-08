@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { workspace } from "../../data/mock";
+import { supabase } from "../../lib/supabase";
+import { coverFor } from "../../lib/cover";
+import { useSession } from "../../context/SessionContext";
 import { Field, inputClasses } from "../ui/Field";
 
 const BRAND_VOICES = [
@@ -10,11 +12,21 @@ const BRAND_VOICES = [
 ];
 
 export function WorkspaceSection({ onSave }: { onSave: (message: string) => void }) {
-  const [name, setName] = useState(workspace.name);
-  const [slug, setSlug] = useState("kafe-iko");
-  const [voice, setVoice] = useState(BRAND_VOICES[0] ?? "");
+  const { activeWorkspace } = useSession();
+  const [name, setName] = useState(activeWorkspace?.name ?? "");
+  const [slug, setSlug] = useState(activeWorkspace?.slug ?? "");
+  const [voice, setVoice] = useState(activeWorkspace?.default_brand_voice ?? BRAND_VOICES[0] ?? "");
+  const [saving, setSaving] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync form when the active workspace resolves/changes.
+  useEffect(() => {
+    if (!activeWorkspace) return;
+    setName(activeWorkspace.name);
+    setSlug(activeWorkspace.slug);
+    setVoice(activeWorkspace.default_brand_voice ?? BRAND_VOICES[0] ?? "");
+  }, [activeWorkspace]);
 
   useEffect(
     () => () => {
@@ -30,7 +42,18 @@ export function WorkspaceSection({ onSave }: { onSave: (message: string) => void
       return;
     }
     setConfirmingDelete(false);
-    onSave("Demo workspace — deletion is disabled.");
+    onSave("Workspace deletion isn't available yet.");
+  };
+
+  const handleSaveChanges = async () => {
+    if (!activeWorkspace) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from("workspaces")
+      .update({ name: name.trim(), slug: slug.trim(), default_brand_voice: voice })
+      .eq("id", activeWorkspace.id);
+    setSaving(false);
+    onSave(error ? `Couldn't save: ${error.message}` : `Workspace “${name.trim()}” saved.`);
   };
 
   return (
@@ -42,7 +65,11 @@ export function WorkspaceSection({ onSave }: { onSave: (message: string) => void
         </p>
 
         <div className="mt-5 flex items-center gap-4">
-          <img src={workspace.logoUrl} alt="" className="size-14 rounded-xl object-cover" />
+          <img
+            src={activeWorkspace?.logo_url ?? coverFor(activeWorkspace?.id ?? "ws")}
+            alt=""
+            className="size-14 rounded-xl object-cover"
+          />
           <button
             type="button"
             onClick={() => onSave("Logo upload arrives with the Firebase Storage milestone.")}
@@ -90,10 +117,11 @@ export function WorkspaceSection({ onSave }: { onSave: (message: string) => void
         <div className="mt-6 flex justify-end">
           <button
             type="button"
-            onClick={() => onSave(`Workspace “${name.trim() || workspace.name}” saved.`)}
-            className="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-transform hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-accent-deep"
+            disabled={saving}
+            onClick={handleSaveChanges}
+            className="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-accent-deep"
           >
-            Save changes
+            {saving ? "Saving…" : "Save changes"}
           </button>
         </div>
       </section>

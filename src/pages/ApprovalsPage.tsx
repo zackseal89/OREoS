@@ -1,8 +1,9 @@
 import { CircleCheck } from "lucide-react";
 import { TopNav } from "../components/layout/TopNav";
-import { notifications } from "../data/mock";
+import { useNotifications } from "../hooks/useData";
 
 export function ApprovalsPage() {
+  const { data: notifications = [] } = useNotifications();
   return (
     <>
       <TopNav notificationCount={notifications.length} />

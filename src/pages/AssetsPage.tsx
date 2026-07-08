@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Bell, CircleHelp, Download, FolderPlus, Search, Trash2, Upload } from "lucide-react";
 import { cn } from "../lib/cn";
+import { supabase } from "../lib/supabase";
+import { queryKeys } from "../lib/queryKeys";
+import { useSession } from "../context/SessionContext";
 import { useToast } from "../hooks/useToast";
-import { assets as seedAssets } from "../data/assets";
-import { campaigns } from "../data/campaigns";
+import { useAssets, useCampaigns } from "../hooks/useData";
 import { AssetCard, AssetSkeletonCard } from "../components/assets/AssetCard";
 import { AssetPreviewModal } from "../components/assets/AssetPreviewModal";
 import { AssetStats } from "../components/assets/AssetStats";
@@ -72,8 +75,14 @@ function isTabId(value: string | null): value is TabId {
 }
 
 export function AssetsPage() {
-  const [items, setItems] = useState<Asset[]>(seedAssets);
-  const [loading, setLoading] = useState(true);
+  const { activeWorkspace } = useSession();
+  const queryClient = useQueryClient();
+  const { data: liveAssets, isLoading: loading } = useAssets();
+  const { data: campaigns = [] } = useCampaigns();
+  const [items, setItems] = useState<Asset[]>([]);
+  useEffect(() => {
+    if (liveAssets) setItems(liveAssets);
+  }, [liveAssets]);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("newest");
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
@@ -97,11 +106,6 @@ export function AssetsPage() {
     else next.set(key, value);
     setParams(next, { replace: true });
   };
-
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(timer);
-  }, []);
 
   // Query + select filters (type tab excluded) — stats and tab counts derive from this.
   const filtered = useMemo(
@@ -166,6 +170,12 @@ export function AssetsPage() {
       return next;
     });
     if (previewId !== null && ids.includes(previewId)) setPreviewId(null);
+    void (async () => {
+      await supabase.from("assets").delete().in("id", ids);
+      if (activeWorkspace) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.assets(activeWorkspace.id) });
+      }
+    })();
   };
 
   const handleDownload = (asset: Asset) =>

@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Bell, CircleHelp, Plus } from "lucide-react";
-import { brands as seedBrands } from "../data/brands";
-import { products } from "../data/products";
-import { campaigns } from "../data/campaigns";
+import { useBrands, useProducts, useCampaigns } from "../hooks/useData";
 import { BrandCard } from "../components/brands/BrandCard";
 import type { Brand } from "../types";
 
-function CreateBrandCard({ onCreate }: { onCreate: () => void }) {
+function CreateBrandCard({ onCreate, first }: { onCreate: () => void; first?: boolean }) {
   return (
     <button
       type="button"
@@ -16,9 +14,13 @@ function CreateBrandCard({ onCreate }: { onCreate: () => void }) {
       <span className="flex size-12 items-center justify-center rounded-full bg-accent text-white">
         <Plus className="size-6" aria-hidden />
       </span>
-      <span className="text-base font-semibold">Add Another Brand</span>
+      <span className="text-base font-semibold">
+        {first ? "Add your first brand" : "Add Another Brand"}
+      </span>
       <span className="max-w-52 text-sm text-ink-muted">
-        For workspaces managing more than one company's identity
+        {first
+          ? "A brand identity keeps every product and campaign consistent."
+          : "For workspaces managing more than one company's identity"}
       </span>
     </button>
   );
@@ -35,6 +37,10 @@ export function BrandsPage() {
   useEffect(() => () => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
   }, []);
+
+  const { data: brands = [], isLoading } = useBrands();
+  const { data: products = [] } = useProducts();
+  const { data: campaigns = [] } = useCampaigns();
 
   const countsFor = (brand: Brand) => ({
     products: products.filter((p) => p.brand === brand.name).length,
@@ -75,23 +81,32 @@ export function BrandsPage() {
 
         {/* Grid */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-          {seedBrands.map((brand) => {
-            const counts = countsFor(brand);
-            return (
-              <BrandCard
-                key={brand.id}
-                brand={brand}
-                productCount={counts.products}
-                campaignCount={counts.campaigns}
-                onManage={(b) =>
-                  showToast(`"${b.name}" opens the Brand Workspace — coming in a later milestone.`)
-                }
+          {isLoading ? (
+            Array.from({ length: 3 }, (_, i) => (
+              <div key={i} className="min-h-[280px] animate-pulse rounded-[20px] border border-line bg-card" />
+            ))
+          ) : (
+            <>
+              {brands.map((brand) => {
+                const counts = countsFor(brand);
+                return (
+                  <BrandCard
+                    key={brand.id}
+                    brand={brand}
+                    productCount={counts.products}
+                    campaignCount={counts.campaigns}
+                    onManage={(b) =>
+                      showToast(`"${b.name}" opens the Brand Workspace — coming in a later milestone.`)
+                    }
+                  />
+                );
+              })}
+              <CreateBrandCard
+                first={brands.length === 0}
+                onCreate={() => showToast("Adding a brand arrives in a later milestone.")}
               />
-            );
-          })}
-          <CreateBrandCard
-            onCreate={() => showToast("Adding another brand arrives in a later milestone.")}
-          />
+            </>
+          )}
         </div>
       </div>
 

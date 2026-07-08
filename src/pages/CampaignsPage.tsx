@@ -12,9 +12,13 @@ import {
   SlidersHorizontal,
   Sparkles,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "../lib/cn";
+import { supabase } from "../lib/supabase";
+import { queryKeys } from "../lib/queryKeys";
+import { useSession } from "../context/SessionContext";
+import { useCampaigns } from "../hooks/useData";
 import { useClickOutside } from "../hooks/useClickOutside";
-import { campaigns as seedCampaigns } from "../data/campaigns";
 import { BulkToolbar } from "../components/campaigns/BulkToolbar";
 import { CampaignCard } from "../components/campaigns/CampaignCard";
 import { CampaignStats } from "../components/campaigns/CampaignStats";
@@ -46,8 +50,6 @@ const SORT_OPTIONS: Array<{ key: CampaignSortKey; label: string; short: string }
   { key: "recent", label: "Recently Updated", short: "Recent" },
   { key: "newest", label: "Newest", short: "Newest" },
   { key: "oldest", label: "Oldest", short: "Oldest" },
-  { key: "reach", label: "Highest Reach", short: "Reach" },
-  { key: "engagement", label: "Highest Engagement", short: "Engagement" },
   { key: "assets", label: "Most Assets", short: "Assets" },
   { key: "alpha", label: "Alphabetical", short: "A–Z" },
 ];
@@ -143,8 +145,18 @@ function CreateCampaignCard({ onCreate }: { onCreate: () => void }) {
 
 export function CampaignsPage() {
   const navigate = useNavigate();
-  const [items, setItems] = useState<Campaign[]>(seedCampaigns);
-  const [loading, setLoading] = useState(true);
+  const { activeWorkspace, session } = useSession();
+  const queryClient = useQueryClient();
+  const { data: liveCampaigns, isLoading: loading } = useCampaigns();
+  const [items, setItems] = useState<Campaign[]>([]);
+  useEffect(() => {
+    if (liveCampaigns) setItems(liveCampaigns);
+  }, [liveCampaigns]);
+  const invalidate = () => {
+    if (activeWorkspace) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.campaigns(activeWorkspace.id) });
+    }
+  };
 
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<TabId>("all");
@@ -168,12 +180,6 @@ export function CampaignsPage() {
   };
   useEffect(() => () => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
-  }, []);
-
-  // Simulated fetch so the skeleton state is real and visible.
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(timer);
   }, []);
 
   // Search + drawer filters (tab-independent). Stats and tab counts derive from this.
@@ -221,39 +227,42 @@ export function CampaignsPage() {
     });
   };
 
+  // Persist a duplicate as a fresh draft campaign, then refresh from the server.
   const duplicateIds = (ids: string[]) => {
-    setItems((current) => {
-      const next = [...current];
-      for (const id of ids) {
-        const index = next.findIndex((c) => c.id === id);
-        const original = next[index];
-        if (!original) continue;
-        const today = new Date().toISOString().slice(0, 10);
-        next.splice(index + 1, 0, {
-          ...original,
-          id: crypto.randomUUID(),
+    if (!activeWorkspace || !session) return;
+    void (async () => {
+      const rows = items.filter((c) => ids.includes(c.id));
+      for (const original of rows) {
+        await supabase.from("campaigns").insert({
+          workspace_id: activeWorkspace.id,
+          owner_id: session.user.id,
           name: `${original.name} (Copy)`,
+          description: original.description || null,
+          platforms: original.platforms,
+          tags: original.tags,
           status: "draft",
-          scheduled: 0,
-          published: 0,
-          reachK: 0,
-          engagementPct: 0,
-          createdAt: today,
-          updatedAt: today,
         });
       }
-      return next;
-    });
+      invalidate();
+    })();
   };
 
   const archiveIds = (ids: string[]) => {
     setItems((current) =>
       current.map((c) => (ids.includes(c.id) ? { ...c, status: "archived" as const } : c)),
     );
+    void (async () => {
+      await supabase.from("campaigns").update({ status: "archived" }).in("id", ids);
+      invalidate();
+    })();
   };
 
   const deleteIds = (ids: string[]) => {
     setItems((current) => current.filter((c) => !ids.includes(c.id)));
+    void (async () => {
+      await supabase.from("campaigns").delete().in("id", ids);
+      invalidate();
+    })();
   };
 
   const clearSelection = () => setSelectedIds(new Set());

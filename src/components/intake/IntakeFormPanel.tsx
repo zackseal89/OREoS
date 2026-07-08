@@ -27,7 +27,9 @@ interface IntakeFormPanelProps {
   productName: string;
   onSave: () => void;
   onRestart: () => void;
+  onViewProduct: () => void;
   saving: boolean;
+  error?: string | null;
 }
 
 export function IntakeFormPanel({
@@ -43,7 +45,9 @@ export function IntakeFormPanel({
   productName,
   onSave,
   onRestart,
+  onViewProduct,
   saving,
+  error,
 }: IntakeFormPanelProps) {
   if (stage === "input") {
     return (
@@ -104,6 +108,12 @@ export function IntakeFormPanel({
             </label>
           )}
         </div>
+
+        {error && (
+          <p className="mt-4 rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
+            {error}
+          </p>
+        )}
 
         <button
           type="button"
@@ -187,13 +197,22 @@ export function IntakeFormPanel({
       <p className="mt-2 text-[15px] text-ink-muted">
         “{productName}” is ready to use in a campaign.
       </p>
-      <button
-        type="button"
-        onClick={onRestart}
-        className="mt-6 flex items-center justify-center gap-2 rounded-xl bg-ink px-4 py-3 text-sm font-semibold text-white transition-transform hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-accent"
-      >
-        Add Another Product
-      </button>
+      <div className="mt-6 flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={onViewProduct}
+          className="flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition-transform hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-accent-deep"
+        >
+          View product
+        </button>
+        <button
+          type="button"
+          onClick={onRestart}
+          className="rounded-xl px-4 py-2.5 text-sm font-medium text-ink-muted transition-colors hover:text-ink"
+        >
+          Add Another Product
+        </button>
+      </div>
     </div>
   );
 }

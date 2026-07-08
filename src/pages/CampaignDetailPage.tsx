@@ -13,16 +13,14 @@ import {
   User,
 } from "lucide-react";
 import { cn } from "../lib/cn";
-import { campaigns } from "../data/campaigns";
-import { assets as allAssets } from "../data/assets";
-import { FALLBACK_COVER } from "../data/campaigns";
+import { coverFor } from "../lib/cover";
+import { useCampaign, useAssets, useNotifications } from "../hooks/useData";
 import { TopNav } from "../components/layout/TopNav";
 import { CampaignStatusBadge } from "../components/ui/Badge";
 import { AssetCard } from "../components/assets/AssetCard";
 import { AssetPreviewModal } from "../components/assets/AssetPreviewModal";
 import { PlatformIcon } from "../components/ui/PlatformIcon";
 import { useToast } from "../hooks/useToast";
-import { notifications } from "../data/mock";
 import type { Asset } from "../types";
 
 const TABS = [
@@ -73,25 +71,6 @@ function CopyRow({
   );
 }
 
-const MOCK_COPY = [
-  {
-    platform: "Instagram",
-    copy: "☕ There's a cup of coffee for every kind of morning. Whether you're rushing out the door or savouring a slow sunrise — our Kenyan AA Beans bring the best of East Africa to your cup. Tap to shop. #KafeikoCoffee #KenyanCoffee #CoffeeCulture",
-  },
-  {
-    platform: "TikTok",
-    copy: "Wait until you see how these beans transform your morning ☕ Watch our roaster break down what makes Kenyan AA so special — bright, complex, and incredibly smooth. Link in bio. #CoffeeTikTok #KenyaAA #SpecialtyCoffee",
-  },
-  {
-    platform: "Facebook",
-    copy: "Introducing our Kenyan AA Beans — sourced from the highlands of Central Kenya and roasted right here in Nairobi. Notes of grapefruit and blackcurrant make every cup a little extraordinary. Order yours today. ↗",
-  },
-  {
-    platform: "LinkedIn",
-    copy: "At Kafe iko Coffee, we believe great coffee starts with great relationships. Our Kenyan AA sourcing programme works directly with smallholder farmers in Nyeri County, ensuring fair prices and exceptional quality. Read the story behind your cup. 🌱",
-  },
-];
-
 function AnalyticsPlaceholder() {
   return (
     <div className="surface flex flex-col items-center gap-4 py-16 text-center">
@@ -100,15 +79,8 @@ function AnalyticsPlaceholder() {
       </span>
       <h3 className="text-lg font-semibold">Analytics connect at launch</h3>
       <p className="max-w-sm text-sm text-ink-muted">
-        Real-time reach, engagement, and conversion data will appear here once your social accounts
-        are linked and posts start publishing.
+        Reach, engagement, and conversion data will appear here once your posts start publishing.
       </p>
-      <a
-        href="/settings?tab=accounts"
-        className="rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-semibold transition-transform hover:scale-[1.02] focus-visible:outline-2 focus-visible:outline-accent"
-      >
-        Connect accounts →
-      </a>
     </div>
   );
 }
@@ -120,12 +92,25 @@ export function CampaignDetailPage() {
   const [tab, setTab] = useState<TabId>("overview");
   const [previewId, setPreviewId] = useState<string | null>(null);
 
-  const campaign = useMemo(() => campaigns.find((c) => c.id === id), [id]);
+  const { data: campaign, isLoading } = useCampaign(id);
+  const { data: notifications = [] } = useNotifications();
+  const { data: allAssets = [] } = useAssets();
 
   const campaignAssets = useMemo(
     () => allAssets.filter((a) => a.campaignId === id),
-    [id],
+    [allAssets, id],
   );
+
+  if (isLoading) {
+    return (
+      <>
+        <TopNav notificationCount={notifications.length} />
+        <main className="flex flex-1 items-center justify-center min-h-[300px]">
+          <div className="size-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+        </main>
+      </>
+    );
+  }
 
   if (!campaign) {
     return (
@@ -188,7 +173,7 @@ export function CampaignDetailPage() {
               <img
                 src={campaign.coverUrl}
                 alt=""
-                onError={(e) => (e.currentTarget.src = FALLBACK_COVER)}
+                onError={(e) => (e.currentTarget.src = coverFor(campaign.id))}
                 className="size-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-ink/70 via-ink/20 to-transparent" />
@@ -293,12 +278,10 @@ export function CampaignDetailPage() {
           {tab === "overview" && (
             <div className="space-y-6">
               {/* Stats row */}
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 <StatCard label="Total Assets" value={campaign.assets} />
                 <StatCard label="Scheduled" value={campaign.scheduled} />
                 <StatCard label="Published" value={campaign.published} />
-                <StatCard label="Reach" value={`${campaign.reachK}K`} sub="estimated" />
-                <StatCard label="Engagement" value={`${campaign.engagementPct}%`} sub="avg. rate" />
                 <div className="surface flex flex-col gap-1 p-5">
                   <p className="text-[13px] text-ink-muted">Progress</p>
                   <p className="text-2xl font-bold">{progress}%</p>
@@ -342,42 +325,6 @@ export function CampaignDetailPage() {
                 </div>
               </div>
 
-              {/* AI Insights placeholder for campaign */}
-              <div className="surface p-6">
-                <h2 className="mb-4 flex items-center gap-2 text-[17px] font-semibold">
-                  <Sparkles className="size-4.5 text-accent" aria-hidden />
-                  AI Recommendations
-                </h2>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {[
-                    {
-                      tone: "bg-accent-soft text-accent-deep",
-                      title: "Best time to post",
-                      body: "Your audience on Instagram is most active between 6–9 PM EAT. Schedule your next post in this window for maximum reach.",
-                    },
-                    {
-                      tone: "bg-info-soft text-info",
-                      title: "Content mix suggestion",
-                      body: "Add 2 more Reels to this campaign — video posts are getting 2.4× more reach than your static images right now.",
-                    },
-                    {
-                      tone: "bg-warn-soft text-warn",
-                      title: "Hashtag opportunity",
-                      body: "#KenyaAACoffee has 85% less competition than #SpecialtyCoffee but similar reach potential for your audience size.",
-                    },
-                  ].map((rec) => (
-                    <div key={rec.title} className="flex items-start gap-3 rounded-2xl border border-line p-4">
-                      <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-full", rec.tone)}>
-                        <Sparkles className="size-3.5" aria-hidden />
-                      </span>
-                      <div>
-                        <p className="text-sm font-semibold">{rec.title}</p>
-                        <p className="mt-1 text-[13px] leading-snug text-ink-muted">{rec.body}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
           )}
 
@@ -417,12 +364,28 @@ export function CampaignDetailPage() {
           {/* Tab: Copy & Schedule */}
           {tab === "copy" && (
             <div className="space-y-4 max-w-2xl">
-              <p className="text-sm text-ink-muted">
-                AI-generated copy for each platform. Review and edit before publishing.
-              </p>
-              {MOCK_COPY.map((row, i) => (
-                <CopyRow key={i} index={i} platform={row.platform} copy={row.copy} />
-              ))}
+              {campaignAssets.length === 0 ? (
+                <div className="surface flex flex-col items-center gap-4 py-16 text-center">
+                  <Sparkles className="size-10 text-ink-muted" aria-hidden />
+                  <p className="text-sm text-ink-muted">
+                    Generated post copy will appear here once this campaign has assets.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-ink-muted">
+                    AI-generated copy for each post. Review and edit before publishing.
+                  </p>
+                  {campaignAssets.map((asset, i) => (
+                    <CopyRow
+                      key={asset.id}
+                      index={i}
+                      platform={asset.platform}
+                      copy={asset.name}
+                    />
+                  ))}
+                </>
+              )}
             </div>
           )}
 

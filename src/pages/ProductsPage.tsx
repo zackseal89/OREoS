@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Bell, CircleHelp, Plus, Search } from "lucide-react";
 import { cn } from "../lib/cn";
-import { products as seedProducts } from "../data/products";
+import { supabase } from "../lib/supabase";
+import { queryKeys } from "../lib/queryKeys";
+import { useSession } from "../context/SessionContext";
+import { useProducts } from "../hooks/useData";
 import { BulkToolbar } from "../components/products/BulkToolbar";
 import { ProductCard } from "../components/products/ProductCard";
 import { ProductStats } from "../components/products/ProductStats";
@@ -37,8 +41,13 @@ function matchesQuery(product: Product, query: string): boolean {
 
 export function ProductsPage() {
   const navigate = useNavigate();
-  const [items, setItems] = useState<Product[]>(seedProducts);
-  const [loading, setLoading] = useState(true);
+  const { activeWorkspace } = useSession();
+  const queryClient = useQueryClient();
+  const { data: liveProducts, isLoading: loading } = useProducts();
+  const [items, setItems] = useState<Product[]>([]);
+  useEffect(() => {
+    if (liveProducts) setItems(liveProducts);
+  }, [liveProducts]);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<TabId>("all");
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
@@ -52,12 +61,6 @@ export function ProductsPage() {
   };
   useEffect(() => () => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
-  }, []);
-
-  // Simulated fetch so the skeleton state is real and visible.
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 500);
-    return () => clearTimeout(timer);
   }, []);
 
   const filtered = useMemo(
@@ -93,8 +96,15 @@ export function ProductsPage() {
     setItems((current) => current.filter((p) => !ids.includes(p.id)));
   };
 
+  // Persist deletes to Supabase, then refresh the live query cache.
   const deleteIds = (ids: string[]) => {
     setItems((current) => current.filter((p) => !ids.includes(p.id)));
+    void (async () => {
+      await supabase.from("products").delete().in("id", ids);
+      if (activeWorkspace) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.products(activeWorkspace.id) });
+      }
+    })();
   };
 
   const clearSelection = () => setSelectedIds(new Set());
@@ -210,9 +220,7 @@ export function ProductsPage() {
                 query={query}
                 selected={selectedIds.has(product.id)}
                 onToggleSelect={toggleSelect}
-                onOpen={(p) =>
-                  showToast(`"${p.name}" opens the Product Detail view — coming in a later milestone.`)
-                }
+                onOpen={(p) => navigate(`/products/${p.id}`)}
                 onCreateCampaign={handleCreateCampaign}
                 onArchive={(id) => {
                   const name = nameOf(id);

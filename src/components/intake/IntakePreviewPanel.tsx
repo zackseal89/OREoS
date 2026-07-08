@@ -117,9 +117,9 @@ export function IntakePreviewPanel({
             Extracted Assets
           </h2>
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {dossier.assetUrls.map((assetUrl) => (
+            {dossier.assetUrls.map((assetUrl, i) => (
               <div
-                key={assetUrl}
+                key={`${i}-${assetUrl}`}
                 className="aspect-square overflow-hidden rounded-xl bg-neutral-100"
               >
                 <img src={assetUrl} alt="" className="size-full object-cover" loading="lazy" />

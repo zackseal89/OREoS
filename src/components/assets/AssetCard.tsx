@@ -1,6 +1,6 @@
 import { Download, Eye, Image, Images, Smartphone, Trash2, Video, type LucideIcon } from "lucide-react";
 import { cn } from "../../lib/cn";
-import { formatDuration } from "../../data/assets";
+import { formatDuration } from "../../lib/format";
 import { AssetStatusBadge } from "../ui/Badge";
 import { Highlight } from "../ui/Highlight";
 import { PlatformIcon } from "../ui/PlatformIcon";

@@ -40,28 +40,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const bootstrapBrandIfNeeded = useCallback(async (workspaceId: string) => {
-    try {
-      const { data: existingBrands } = await supabase
-        .from("brands")
-        .select("id")
-        .eq("workspace_id", workspaceId)
-        .limit(1);
-      if (!existingBrands || existingBrands.length === 0) {
-        await supabase.from("brands").insert({
-          workspace_id: workspaceId,
-          name: "Kafe iko Coffee",
-          logo_url: "https://images.unsplash.com/photo-1447933601403-0c6688de566e?auto=format&fit=crop&w=96&q=70",
-          industry: "Beverages",
-          colors: ["#6F4E37", "#ECE0D1", "#3B2F2F", "#D5B895"],
-          typography_headline: "Playfair Display",
-          voice_summary: "Warm, authentic, and passionate about the craft of coffee. We speak to coffee enthusiasts and casual drinkers alike, emphasizing heritage and quality."
-        });
-      }
-    } catch (e) {
-      console.error("Failed to bootstrap brand:", e);
-    }
-  }, []);
 
   const loadUserData = useCallback(async (userId: string) => {
     const [{ data: prof }, { data: memberships }] = await Promise.all([
@@ -75,12 +53,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setWorkspaces(list);
     setActiveId((current) => current ?? list[0]?.workspace.id ?? null);
   }, []);
-
-  useEffect(() => {
-    if (activeId) {
-      bootstrapBrandIfNeeded(activeId);
-    }
-  }, [activeId, bootstrapBrandIfNeeded]);
 
   useEffect(() => {
     let active = true;

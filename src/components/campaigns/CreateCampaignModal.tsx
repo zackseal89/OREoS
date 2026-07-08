@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Megaphone, Plus, Sparkles, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "../../lib/cn";
-import { products } from "../../data/products";
-import { brands } from "../../data/brands";
+import { supabase } from "../../lib/supabase";
+import { queryKeys } from "../../lib/queryKeys";
+import { useSession } from "../../context/SessionContext";
+import { useProducts, useBrands } from "../../hooks/useData";
 import { PlatformIcon } from "../ui/PlatformIcon";
 import type { Platform } from "../../types";
 
@@ -81,8 +84,13 @@ export function CreateCampaignModal({
     productId: preselectedProductId ?? "",
   });
   const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const nameRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
+  const { session, activeWorkspace } = useSession();
+  const { data: products = [] } = useProducts();
+  const { data: brands = [] } = useBrands();
 
   // reset when opened
   useEffect(() => {
@@ -120,14 +128,33 @@ export function CreateCampaignModal({
         ? form.platforms.length > 0
         : true;
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
+    if (!activeWorkspace || !session) return;
     setCreating(true);
-    // Simulated async — the real call goes to a Cloud Function in Phase 3.
-    setTimeout(() => {
-      onCreated(form.name.trim());
-      onClose();
-      navigate("/campaigns");
-    }, 700);
+    setError(null);
+    const { data, error: insertError } = await supabase
+      .from("campaigns")
+      .insert({
+        workspace_id: activeWorkspace.id,
+        owner_id: session.user.id,
+        name: form.name.trim(),
+        description: form.description.trim() || null,
+        platforms: form.platforms,
+        brand_id: form.brandId || null,
+        product_id: form.productId || null,
+        status: "draft",
+      })
+      .select("id")
+      .single();
+    if (insertError) {
+      setCreating(false);
+      setError(insertError.message);
+      return;
+    }
+    void queryClient.invalidateQueries({ queryKey: queryKeys.campaigns(activeWorkspace.id) });
+    onCreated(form.name.trim());
+    onClose();
+    navigate(`/campaigns/${data.id}`);
   };
 
   if (!open) return null;
@@ -331,6 +358,12 @@ export function CreateCampaignModal({
             </div>
           )}
         </div>
+
+        {error && (
+          <p className="border-t border-line bg-danger/5 px-6 py-2.5 text-xs text-danger">
+            Couldn't create campaign: {error}
+          </p>
+        )}
 
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-line px-6 py-4">
