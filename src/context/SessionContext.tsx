@@ -57,22 +57,38 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
 
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!active) return;
-      setSession(data.session);
-      if (data.session) await loadUserData(data.session.user.id);
-      setLoading(false);
-    });
-
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, next) => {
+    // IMPORTANT: never await Supabase queries inside onAuthStateChange —
+    // supabase-js holds an internal auth lock while dispatching the event, so
+    // queries issued synchronously in the callback deadlock (symptom: infinite
+    // loading spinner whenever the page loads with an expired token that gets
+    // refreshed on startup). Defer to the next tick instead.
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       if (!active) return;
       setSession(next);
       if (next) {
-        await loadUserData(next.user.id);
+        setTimeout(() => {
+          if (!active) return;
+          void loadUserData(next.user.id).finally(() => {
+            if (active) setLoading(false);
+          });
+        }, 0);
       } else {
         setProfile(null);
         setWorkspaces([]);
         setActiveId(null);
+        setLoading(false);
+      }
+    });
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      setSession(data.session);
+      if (data.session) {
+        void loadUserData(data.session.user.id).finally(() => {
+          if (active) setLoading(false);
+        });
+      } else {
+        setLoading(false);
       }
     });
 
