@@ -153,12 +153,15 @@ export interface TeamMember {
   invited?: boolean;
 }
 
-export type AccountStatus = "connected" | "expiring" | "disconnected";
+/** Matches PostProxy's profile status values (GET /profiles). */
+export type AccountStatus = "active" | "expired" | "inactive";
 
 export interface ConnectedAccount {
+  id: string;
   platform: Platform;
-  handle: string;
+  name: string;
   status: AccountStatus;
+  avatarUrl?: string;
 }
 
 export interface NotificationPref {
@@ -200,5 +203,44 @@ export interface Asset {
   durationSec?: number; // videos only
   createdAt: string; // ISO date
   tags: string[];
+  /** AI-generated post copy — present on pipeline-generated assets. */
+  copyCaption?: string;
+  copyHashtags?: string[];
+  performanceScore?: number; // 0–100, model self-assessment
+  brandFitScore?: number; // 0–100
+  strategicRationale?: string;
+  /** PostProxy's id for this post, once publish-asset has sent it. */
+  postproxyPostId?: string;
+  /** Last publish attempt's error message, if any (cleared on success). */
+  publishError?: string;
+}
+
+/** Lifecycle: proposed → approved | rejected (HITL gate before generation). */
+export type IdeaStatus = "proposed" | "approved" | "rejected";
+
+/** An AI-pitched content idea awaiting human judgement. */
+export interface CampaignIdea {
+  id: string;
+  campaignId: string;
+  title: string;
+  description: string;
+  format: AssetType;
+  platforms: Platform[];
+  status: IdeaStatus;
+  strategicRationale: string;
+  creativeDirection: string;
+  contentPillar: string;
+  createdAt: string;
+}
+
+export type GenerationJobStatus = "queued" | "running" | "succeeded" | "failed";
+
+/** Progress row for the asset-generation pipeline. */
+export interface GenerationJob {
+  id: string;
+  ideaId: string;
+  campaignId: string;
+  status: GenerationJobStatus;
+  error?: string;
 }
 

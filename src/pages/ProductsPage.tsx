@@ -5,6 +5,7 @@ import { Bell, CircleHelp, Plus, Search } from "lucide-react";
 import { cn } from "../lib/cn";
 import { supabase } from "../lib/supabase";
 import { queryKeys } from "../lib/queryKeys";
+import { createCampaignModal } from "../App";
 import { useSession } from "../context/SessionContext";
 import { useProducts } from "../hooks/useData";
 import { BulkToolbar } from "../components/products/BulkToolbar";
@@ -111,8 +112,7 @@ export function ProductsPage() {
   const selectedList = [...selectedIds];
 
   const handleAddProduct = () => navigate("/");
-  const handleCreateCampaign = (product: Product) =>
-    showToast(`Creating a campaign from "${product.name}" arrives in a later milestone.`);
+  const handleCreateCampaign = (product: Product) => createCampaignModal.open(product.id);
 
   return (
     <main className="relative flex-1">
@@ -246,7 +246,11 @@ export function ProductsPage() {
       {/* Bulk selection toolbar */}
       <BulkToolbar
         count={selectedIds.size}
-        onCreateCampaign={() => showToast("Bulk campaign creation arrives in a later milestone.")}
+        onCreateCampaign={() => {
+          // The campaign wizard takes one hero product; start with the first selected.
+          createCampaignModal.open(selectedList[0]);
+          clearSelection();
+        }}
         onArchive={() => {
           archiveIds(selectedList);
           clearSelection();

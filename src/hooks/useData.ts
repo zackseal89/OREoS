@@ -13,6 +13,9 @@ import type {
   Asset,
   Brand,
   Campaign,
+  CampaignIdea,
+  ConnectedAccount,
+  GenerationJob,
   NotificationItem,
   Product,
   ProductDossier,
@@ -204,6 +207,13 @@ function mapAsset(row: any): Asset {
     durationSec: row.duration_sec ?? undefined,
     createdAt: day(row.created_at),
     tags: row.tags ?? [],
+    copyCaption: row.copy_caption ?? undefined,
+    copyHashtags: row.copy_hashtags ?? undefined,
+    performanceScore: row.performance_score ?? undefined,
+    brandFitScore: row.brand_fit_score ?? undefined,
+    strategicRationale: row.strategic_rationale ?? undefined,
+    postproxyPostId: row.postproxy_post_id ?? undefined,
+    publishError: row.publish_error ?? undefined,
   };
 }
 
@@ -221,6 +231,65 @@ export function useAssets() {
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []).map(mapAsset);
+    },
+  });
+}
+
+// ── Campaign ideas (HITL gate) ──────────────────────────────────────────────
+function mapIdea(row: any): CampaignIdea {
+  return {
+    id: row.id,
+    campaignId: row.campaign_id,
+    title: row.title,
+    description: row.description,
+    format: row.format,
+    platforms: row.platforms ?? [],
+    status: row.status,
+    strategicRationale: row.strategic_rationale ?? row.rationale ?? "",
+    creativeDirection: row.creative_direction ?? "",
+    contentPillar: row.content_pillar ?? "",
+    createdAt: day(row.created_at),
+  };
+}
+
+export function useCampaignIdeas(campaignId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.campaignIdeas(campaignId ?? "none"),
+    enabled: !!campaignId,
+    queryFn: async (): Promise<CampaignIdea[]> => {
+      const { data, error } = await supabase
+        .from("campaign_ideas")
+        .select("*")
+        .eq("campaign_id", campaignId!)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []).map(mapIdea);
+    },
+  });
+}
+
+export function useGenerationJobs(campaignId: string | undefined) {
+  return useQuery({
+    queryKey: ["generationJobsByCampaign", campaignId ?? "none"] as const,
+    enabled: !!campaignId,
+    // Poll while any job is in flight — resilient even if realtime drops.
+    refetchInterval: (query) =>
+      (query.state.data ?? []).some((j) => j.status === "queued" || j.status === "running")
+        ? 4000
+        : false,
+    queryFn: async (): Promise<GenerationJob[]> => {
+      const { data, error } = await supabase
+        .from("generation_jobs")
+        .select("id, idea_id, campaign_id, status, error")
+        .eq("campaign_id", campaignId!);
+      if (error) throw error;
+      return (data ?? []).map((r: any) => ({
+        id: r.id,
+        ideaId: r.idea_id,
+        campaignId: r.campaign_id,
+        status: r.status,
+        error: r.error ?? undefined,
+      }));
     },
   });
 }
@@ -254,6 +323,23 @@ export function useBrands() {
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []).map(mapBrand);
+    },
+  });
+}
+
+// ── Connected accounts (PostProxy) ──────────────────────────────────────────
+export function useConnectedAccounts() {
+  const { activeWorkspace } = useSession();
+  const wsId = activeWorkspace?.id;
+  return useQuery({
+    queryKey: ["connectedAccounts", wsId ?? "none"] as const,
+    enabled: !!wsId,
+    queryFn: async (): Promise<ConnectedAccount[]> => {
+      const { data, error } = await supabase.functions.invoke("list-accounts", {
+        body: { workspaceId: wsId },
+      });
+      if (error) throw error;
+      return (data?.accounts ?? []) as ConnectedAccount[];
     },
   });
 }

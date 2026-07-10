@@ -10,6 +10,7 @@ import {
   Tag,
 } from "lucide-react";
 import { cn } from "../lib/cn";
+import { createCampaignModal } from "../App";
 import { useProduct, useCampaigns, useNotifications } from "../hooks/useData";
 import { TopNav } from "../components/layout/TopNav";
 import { ProductStatusBadge } from "../components/ui/Badge";
@@ -24,7 +25,7 @@ type TabId = (typeof TABS)[number]["id"];
 export function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { toast, showToast } = useToast();
+  const { toast } = useToast();
   const [tab, setTab] = useState<TabId>("dossier");
 
   const { data: product, isLoading } = useProduct(id);
@@ -110,9 +111,7 @@ export function ProductDetailPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() =>
-                      showToast("Campaign creation from Product Detail arrives in a later milestone.")
-                    }
+                    onClick={() => createCampaignModal.open(product.id)}
                     className="flex shrink-0 items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-transform hover:scale-[1.02] focus-visible:outline-2 focus-visible:outline-accent-deep"
                   >
                     <Megaphone className="size-4" aria-hidden />
@@ -290,9 +289,7 @@ export function ProductDetailPage() {
                 <p className="text-sm text-ink-muted">No campaigns linked to this product yet.</p>
                 <button
                   type="button"
-                  onClick={() =>
-                    showToast("Campaign creation from Product Detail arrives in a later milestone.")
-                  }
+                  onClick={() => createCampaignModal.open(product.id)}
                   className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white"
                 >
                   <Megaphone className="size-4" aria-hidden />

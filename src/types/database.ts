@@ -52,6 +52,8 @@ export type Database = {
           name: string
           performance_score: number | null
           platform: Database["public"]["Enums"]["platform"]
+          postproxy_post_id: string | null
+          publish_error: string | null
           regeneration_options: Json | null
           scheduled_at: string | null
           size_label: string | null
@@ -74,6 +76,8 @@ export type Database = {
           name: string
           performance_score?: number | null
           platform: Database["public"]["Enums"]["platform"]
+          postproxy_post_id?: string | null
+          publish_error?: string | null
           regeneration_options?: Json | null
           scheduled_at?: string | null
           size_label?: string | null
@@ -96,6 +100,8 @@ export type Database = {
           name?: string
           performance_score?: number | null
           platform?: Database["public"]["Enums"]["platform"]
+          postproxy_post_id?: string | null
+          publish_error?: string | null
           regeneration_options?: Json | null
           scheduled_at?: string | null
           size_label?: string | null
@@ -627,6 +633,7 @@ export type Database = {
           name: string
           owner_id: string
           plan: Database["public"]["Enums"]["plan_type"]
+          postproxy_profile_group_id: string | null
           slug: string
         }
         Insert: {
@@ -639,6 +646,7 @@ export type Database = {
           name: string
           owner_id: string
           plan?: Database["public"]["Enums"]["plan_type"]
+          postproxy_profile_group_id?: string | null
           slug: string
         }
         Update: {
@@ -651,6 +659,7 @@ export type Database = {
           name?: string
           owner_id?: string
           plan?: Database["public"]["Enums"]["plan_type"]
+          postproxy_profile_group_id?: string | null
           slug?: string
         }
         Relationships: [
@@ -717,6 +726,7 @@ export type Database = {
       }
     }
     Functions: {
+      approve_and_generate: { Args: { idea_ids: string[] }; Returns: Json }
       increment_workspace_credits: {
         Args: { amount: number; ws_id: string }
         Returns: undefined
